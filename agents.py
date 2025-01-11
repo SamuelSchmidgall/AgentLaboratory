@@ -32,7 +32,7 @@ def extract_json_between_markers(llm_output):
 
 
 
-def get_score(outlined_plan, latex, reward_model_llm, reviewer_type=None, attempts=3, openai_api_key=None):
+def get_score(outlined_plan, latex, reward_model_llm, reviewer_type=None, attempts=3, openai_api_key=None, base_url=''):
     e = str()
     for _attempt in range(attempts):
         try:
@@ -144,7 +144,7 @@ def get_score(outlined_plan, latex, reward_model_llm, reviewer_type=None, attemp
                 openai_api_key=openai_api_key,
                 prompt=(
                     f"Outlined in the following text is the research plan that the machine learning engineer was tasked with building: {outlined_plan}\n\n"
-                    f"The following text is the research latex that the model produced: \n{latex}\n\n"), temp=0.0)
+                    f"The following text is the research latex that the model produced: \n{latex}\n\n"), temp=0.0, base_url=base_url)
             review_json = extract_json_between_markers(scoring)
 
             overall = int(review_json["Overall"]) / 10
@@ -181,27 +181,28 @@ def get_score(outlined_plan, latex, reward_model_llm, reviewer_type=None, attemp
 
 
 class ReviewersAgent:
-    def __init__(self, model="gpt-4o-mini", notes=None, openai_api_key=None):
+    def __init__(self, model="gpt-4o-mini", notes=None, openai_api_key=None, base_url=''):
         if notes is None: self.notes = []
         else: self.notes = notes
         self.model = model
         self.openai_api_key = openai_api_key
+        self.base_url=base_url
 
     def inference(self, plan, report):
         reviewer_1 = "You are a harsh but fair reviewer and expect good experiments that lead to insights for the research topic."
-        review_1 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_1, openai_api_key=self.openai_api_key)
+        review_1 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_1, openai_api_key=self.openai_api_key, base_url=self.base)
 
         reviewer_2 = "You are a harsh and critical but fair fair reviewer who is looking for idea that would be impactful in the field."
-        review_2 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_2, openai_api_key=self.openai_api_key)
+        review_2 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_2, openai_api_key=self.openai_api_key, base_url=self.base)
 
         reviewer_3 = "You are a harsh but fair open-minded reviewer that is looking for novel ideas that have not been proposed before."
-        review_3 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_3, openai_api_key=self.openai_api_key)
+        review_3 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_3, openai_api_key=self.openai_api_key, base_url=self.base)
 
         return f"Reviewer #1:\n{review_1}, \nReviewer #2:\n{review_2}, \nReviewer #3:\n{review_3}"
 
 
 class BaseAgent:
-    def __init__(self, model="gpt-4o-mini", notes=None, max_steps=100, openai_api_key=None):
+    def __init__(self, model="gpt-4o-mini", notes=None, max_steps=100, openai_api_key=None, base_url=''):
         if notes is None: self.notes = []
         else: self.notes = notes
         self.max_steps = max_steps
@@ -222,6 +223,7 @@ class BaseAgent:
         self.prev_results_code = str()
         self.prev_interpretation = str()
         self.openai_api_key = openai_api_key
+        self.base_url=base_url
 
         self.second_round = False
         self.max_hist_len = 15
@@ -251,7 +253,7 @@ class BaseAgent:
             f"Current Step #{step}, Phase: {phase}\n{complete_str}\n"
             f"[Objective] Your goal is to perform research on the following topic: {research_topic}\n"
             f"Feedback: {feedback}\nNotes: {notes_str}\nYour previous command was: {self.prev_comm}. Make sure your new output is very different.\nPlease produce a single command below:\n")
-        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, temp=temp, openai_api_key=self.openai_api_key)
+        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, temp=temp, openai_api_key=self.openai_api_key, base_url=self.base_url)
         print("^"*50, phase, "^"*50)
         model_resp = self.clean_text(model_resp)
         self.prev_comm = model_resp
@@ -291,8 +293,8 @@ class BaseAgent:
 
 
 class ProfessorAgent(BaseAgent):
-    def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None):
-        super().__init__(model, notes, max_steps, openai_api_key)
+    def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None, base_url=''):
+        super().__init__(model, notes, max_steps, openai_api_key, base_url)
         self.phases = ["report writing"]
 
     def generate_readme(self):
@@ -301,7 +303,7 @@ class ProfessorAgent(BaseAgent):
         prompt = (
             f"""History: {history_str}\n{'~' * 10}\n"""
             f"Please produce the readme below in markdown:\n")
-        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, openai_api_key=self.openai_api_key)
+        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, openai_api_key=self.openai_api_key, base_url=self.base_url)
         return model_resp.replace("```markdown", "")
 
     def context(self, phase):
@@ -357,8 +359,8 @@ class ProfessorAgent(BaseAgent):
 
 
 class PostdocAgent(BaseAgent):
-    def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None):
-        super().__init__(model, notes, max_steps, openai_api_key)
+    def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None, base_url=''):
+        super().__init__(model, notes, max_steps, openai_api_key, base_url)
         self.phases = ["plan formulation", "results interpretation"]
 
     def context(self, phase):
@@ -433,8 +435,8 @@ class PostdocAgent(BaseAgent):
 
 
 class MLEngineerAgent(BaseAgent):
-    def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None):
-        super().__init__(model, notes, max_steps, openai_api_key)
+    def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None, base_url=''):
+        super().__init__(model, notes, max_steps, openai_api_key, base_url)
         self.phases = [
             "data preparation",
             "running experiments",
@@ -498,8 +500,8 @@ class MLEngineerAgent(BaseAgent):
 
 
 class PhDStudentAgent(BaseAgent):
-    def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None):
-        super().__init__(model, notes, max_steps, openai_api_key)
+    def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None, base_url=''):
+        super().__init__(model, notes, max_steps, openai_api_key,base_url)
         self.phases = [
             "literature review",
             "plan formulation",
@@ -579,7 +581,7 @@ class PhDStudentAgent(BaseAgent):
         prompt = (
             f"""History: {history_str}\n{'~' * 10}\n"""
             f"Please produce the requirements.txt below in markdown:\n")
-        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, openai_api_key=self.openai_api_key)
+        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, openai_api_key=self.openai_api_key, base_url=self.base_url)
         return model_resp
 
     def example_command(self, phase):

@@ -202,25 +202,64 @@ class ArxivSearch:
         # Construct the default API client.
         self.sch_engine = arxiv.Client()
 
-    def find_papers_by_str(self, query, N=20):
-        search = arxiv.Search(
-            query="abs:" + query,
-            max_results=N,
-            sort_by=arxiv.SortCriterion.Relevance)
+    def _process_query(self, query: str) -> str:
+        """Process query string to fit within MAX_QUERY_LENGTH while preserving as much information as possible"""
+        MAX_QUERY_LENGTH = 300
 
-        paper_sums = list()
-        # `results` is a generator; you can iterate over its elements one by one...
-        for r in self.sch_engine.results(search):
-            paperid = r.pdf_url.split("/")[-1]
-            pubdate = str(r.published).split(" ")[0]
-            paper_sum = f"Title: {r.title}\n"
-            paper_sum += f"Summary: {r.summary}\n"
-            paper_sum += f"Publication Date: {pubdate}\n"
-            paper_sum += f"Categories: {' '.join(r.categories)}\n"
-            paper_sum += f"arXiv paper ID: {paperid}\n"
-            paper_sums.append(paper_sum)
-        time.sleep(2.0)
-        return "\n".join(paper_sums)
+        if len(query) <= MAX_QUERY_LENGTH:
+            return query
+
+        # Split into words
+        words = query.split()
+        processed_query = []
+        current_length = 0
+
+        # Add words while staying under the limit
+        # Account for spaces between words
+        for word in words:
+            # +1 for the space that will be added between words
+            if current_length + len(word) + 1 <= MAX_QUERY_LENGTH:
+                processed_query.append(word)
+                current_length += len(word) + 1
+            else:
+                break
+
+        return ' '.join(processed_query)
+
+    def find_papers_by_str(self, query, N=20):
+        processed_query = self._process_query(query)
+        max_retries = 3
+        retry_count = 0
+
+        while retry_count < max_retries:
+            try:
+                search = arxiv.Search(
+                    query="abs:" + processed_query,
+                    max_results=N,
+                    sort_by=arxiv.SortCriterion.Relevance)
+
+                paper_sums = list()
+                # `results` is a generator; you can iterate over its elements one by one...
+                for r in self.sch_engine.results(search):
+                    paperid = r.pdf_url.split("/")[-1]
+                    pubdate = str(r.published).split(" ")[0]
+                    paper_sum = f"Title: {r.title}\n"
+                    paper_sum += f"Summary: {r.summary}\n"
+                    paper_sum += f"Publication Date: {pubdate}\n"
+                    paper_sum += f"Categories: {' '.join(r.categories)}\n"
+                    paper_sum += f"arXiv paper ID: {paperid}\n"
+                    paper_sums.append(paper_sum)
+                time.sleep(2.0)
+                return "\n".join(paper_sums)
+
+            except Exception as e:
+                retry_count += 1
+                if retry_count < max_retries:
+                    # 递增延时
+                    time.sleep(2 * retry_count)
+                    continue
+
+        return None
 
     def retrieve_full_paper_text(self, query):
         pdf_text = str()
@@ -246,6 +285,7 @@ class ArxivSearch:
         os.remove("downloaded-paper.pdf")
         time.sleep(2.0)
         return pdf_text
+
 
 """
 import multiprocessing
@@ -298,8 +338,6 @@ import sys
 import traceback
 import concurrent.futures
 
-
-
 import multiprocessing
 import io
 import sys
@@ -311,7 +349,7 @@ import traceback
 
 
 def execute_code(code_str, timeout=60, MAX_LEN=1000):
-    #print(code_str)
+    # print(code_str)
 
     # prevent plotting errors
     import matplotlib
@@ -323,7 +361,7 @@ def execute_code(code_str, timeout=60, MAX_LEN=1000):
         return "[CODE EXECUTION ERROR] pubmed Download took way too long. Program terminated"
     if "exit(" in code_str:
         return "[CODE EXECUTION ERROR] The exit() command is not allowed you must remove this."
-    #print(code_str)
+    # print(code_str)
     # Capturing the output
     output_capture = io.StringIO()
     sys.stdout = output_capture
@@ -354,6 +392,5 @@ def execute_code(code_str, timeout=60, MAX_LEN=1000):
 
     # Returning the captured output
     return output_capture.getvalue()[:MAX_LEN]
-
 
 

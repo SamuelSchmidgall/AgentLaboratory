@@ -15,6 +15,7 @@ def curr_cost_est():
         "o1-preview": 15.00 / 1000000,
         "o1-mini": 3.00 / 1000000,
         "claude-3-5-sonnet": 3.00 / 1000000,
+        "deepseek-chat": 1.00 / 1000000,  # Example cost, adjust as needed
     }
     costmap_out = {
         "gpt-4o": 10.00/ 1000000,
@@ -22,6 +23,7 @@ def curr_cost_est():
         "o1-preview": 60.00 / 1000000,
         "o1-mini": 12.00 / 1000000,
         "claude-3-5-sonnet": 12.00 / 1000000,
+        "deepseek-chat": 5.00 / 1000000,  # Example cost, adjust as needed
     }
     return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
 
@@ -124,10 +126,39 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     completion = client.chat.completions.create(
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
+            elif model_str == "deepseek-chat":
+                model_str = "deepseek-chat"
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}]
+                try:
+                    encoding = tiktoken.get_encoding("deepseek-chat")
+                except KeyError:
+                    raise Exception("Could not automatically map deepseek-chat to a tokeniser. Please use tiktoken.get_encoding to explicitly get the tokeniser you expect.")
+                if version == "0.28":
+                    if temp is None:
+                        completion = openai.ChatCompletion.create(
+                            model=f"{model_str}",  # engine = "deployment_name".
+                            messages=messages
+                        )
+                    else:
+                        completion = openai.ChatCompletion.create(
+                            model=f"{model_str}",  # engine = "deployment_name".
+                            messages=messages, temperature=temp
+                        )
+                else:
+                    client = OpenAI()
+                    if temp is None:
+                        completion = client.chat.completions.create(
+                            model="deepseek-chat-2024-07-18", messages=messages, )
+                    else:
+                        completion = client.chat.completions.create(
+                            model="deepseek-chat-2024-07-18", messages=messages, temperature=temp)
+                answer = completion.choices[0].message.content
 
-            if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet"]:
-                encoding = tiktoken.encoding_for_model("gpt-4o")
-            else: encoding = tiktoken.encoding_for_model(model_str)
+            if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "deepseek-chat"]:
+                encoding = tiktoken.get_encoding("gpt-4o")
+            else: encoding = tiktoken.get_encoding(model_str)
             if model_str not in TOKENS_IN:
                 TOKENS_IN[model_str] = 0
                 TOKENS_OUT[model_str] = 0

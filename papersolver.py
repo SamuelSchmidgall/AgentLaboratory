@@ -243,7 +243,8 @@ Please make sure the abstract reads smoothly and is well-motivated. This should 
 }
 
 class PaperSolver:
-    def __init__(self, llm_str, notes=None, max_steps=10, insights=None, plan=None, exp_code=None, exp_results=None, lit_review=None, ref_papers=None, topic=None, openai_api_key=None, compile_pdf=True):
+    def __init__(self, llm_str, notes=None, max_steps=10, insights=None, plan=None, exp_code=None, exp_results=None, lit_review=None, ref_papers=None, topic=None,
+                 openai_api_key=None, compile_pdf=True, base_url=''):
         if notes is None: self.notes = []
         else: self.notes = notes
         if plan is None: self.plan = ""
@@ -271,6 +272,7 @@ class PaperSolver:
         self.prev_paper_ret = str()
         self.section_related_work = {}
         self.openai_api_key = openai_api_key
+        self.base_url=base_url
 
     def solve(self):
         num_attempts = 0
@@ -284,7 +286,7 @@ class PaperSolver:
                 system_prompt=self.system_prompt(),
                 prompt=f"\nNow please enter a command: ",
                 temp=1.0,
-                openai_api_key=self.openai_api_key)
+                openai_api_key=self.openai_api_key, base_url=self.base_url)
             #print(model_resp)
             model_resp = self.clean_text(model_resp)
             cmd_str, paper_lines, prev_paper_ret, score = self.process_command(model_resp)
@@ -351,7 +353,7 @@ class PaperSolver:
                         break
                     if not first_attempt:
                         att_str = "This is not your first attempt please try to come up with a simpler search query."
-                    search_query = query_model(model_str=f"{self.llm_str}", prompt=f"Given the following research topic {self.topic} and research plan: \n\n{self.plan}\n\nPlease come up with a search query to find relevant papers on arXiv. Respond only with the search query and nothing else. This should be a a string that will be used to find papers with semantically similar content. {att_str}", system_prompt=f"You are a research paper finder. You must find papers for the section {_section}. Query must be text nothing else.", openai_api_key=self.openai_api_key)
+                    search_query = query_model(model_str=f"{self.llm_str}", prompt=f"Given the following research topic {self.topic} and research plan: \n\n{self.plan}\n\nPlease come up with a search query to find relevant papers on arXiv. Respond only with the search query and nothing else. This should be a a string that will be used to find papers with semantically similar content. {att_str}", system_prompt=f"You are a research paper finder. You must find papers for the section {_section}. Query must be text nothing else.", openai_api_key=self.openai_api_key, base_url=self.base_url)
                     search_query.replace('"', '')
                     papers = arx.find_papers_by_str(query=search_query, N=10)
                     first_attempt = False
@@ -374,7 +376,7 @@ class PaperSolver:
                     system_prompt=self.system_prompt(section=_section),
                     prompt=f"{prompt}",
                     temp=0.8,
-                    openai_api_key=self.openai_api_key)
+                    openai_api_key=self.openai_api_key, base_url=self.base_url)
                 model_resp = self.clean_text(model_resp)
                 if _section == "scaffold":
                     # minimal scaffold (some other sections can be combined)
@@ -437,7 +439,7 @@ class PaperSolver:
                         else:
                             paper_lines = copy(args[1]) #
                             if scoring:
-                                score, cmd_str, is_valid = get_score(self.plan, "\n".join(paper_lines), reward_model_llm=self.llm_str)
+                                score, cmd_str, is_valid = get_score(self.plan, "\n".join(paper_lines), reward_model_llm=self.llm_str, base_url=self.base_url)
                             else:
                                 score, cmd_str, is_valid = 0.0, "Paper scored successfully", True
                             if is_valid: failed = False
@@ -459,7 +461,7 @@ class PaperSolver:
                     if success:
                         paper_lines = copy(args[0]) #
                         if scoring:
-                            score, cmd_str, is_valid = get_score(self.plan, "\n".join(paper_lines), reward_model_llm=self.llm_str)
+                            score, cmd_str, is_valid = get_score(self.plan, "\n".join(paper_lines), reward_model_llm=self.llm_str, base_url=self.base_url)
                         else:
                             score, cmd_str, is_valid = 0.0, "Paper scored successfully", True
                         if is_valid: failed = False

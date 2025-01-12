@@ -4,14 +4,13 @@ from copy import deepcopy
 from common_imports import *
 from abc import abstractmethod
 
-
 from tools import *
 from inference import *
 from pathlib import Path
 
-
 from contextlib import contextmanager
 import sys, os
+
 
 @contextmanager
 def suppress_stdout():
@@ -29,8 +28,8 @@ logging.basicConfig(level=logging.WARNING)
 warnings.filterwarnings("ignore")
 warnings.simplefilter(action='ignore', category=FutureWarning)
 import logging
-logging.getLogger('sklearn.model_selection').setLevel(logging.WARNING)
 
+logging.getLogger('sklearn.model_selection').setLevel(logging.WARNING)
 
 GLOBAL_REPAIR_ATTEMPTS = 2
 
@@ -62,6 +61,7 @@ class Command:
 @@@@@@@@@@@@@@@@@@
 """
 
+
 class Replace(Command):
     def __init__(self):
         super().__init__()
@@ -92,7 +92,6 @@ class Replace(Command):
         return True, (new_code.split("\n"), code_ret)
 
 
-
 class Edit(Command):
     def __init__(self):
         super().__init__()
@@ -116,7 +115,7 @@ class Edit(Command):
             args = args[0]
             current_code = args[2]
             lines_to_add = list(reversed(args[3]))
-            lines_to_replace = list(reversed(range(args[0], args[1]+1)))
+            lines_to_replace = list(reversed(range(args[0], args[1] + 1)))
             for _ln in lines_to_replace:
                 current_code.pop(_ln)
             for _line in lines_to_add:
@@ -148,7 +147,7 @@ class Edit(Command):
             return False, (None, None, None, None, None)
 
 
-def get_score(outlined_plan, code, code_return, REWARD_MODEL_LLM, attempts=3, openai_api_key=None):
+def get_score(outlined_plan, code, code_return, REWARD_MODEL_LLM, attempts=3, openai_api_key=None, base_url=''):
     e = str()
     for _attempt in range(attempts):
         try:
@@ -164,7 +163,7 @@ def get_score(outlined_plan, code, code_return, REWARD_MODEL_LLM, attempts=3, op
                 prompt=(
                     f"Outlined in the following text is the research plan that the machine learning engineer was tasked with building: {outlined_plan}\n\n"
                     f"The following text is the research code that the model produced: \n{code}\n\n"
-                    f"The following is the output from the model: {code_return}\n\n"), temp=0.6)
+                    f"The following is the output from the model: {code_return}\n\n"), temp=0.6, base_url=base_url)
             performance = extract_prompt(text=scoring, word="SCORE")
             performance = float(performance)
             return performance, f"The performance of your submission is: {performance}", True
@@ -173,7 +172,7 @@ def get_score(outlined_plan, code, code_return, REWARD_MODEL_LLM, attempts=3, op
     return 0, e
 
 
-def code_repair(code, error, ctype, REPAIR_LLM, openai_api_key=None):
+def code_repair(code, error, ctype, REPAIR_LLM, openai_api_key=None, base_url=''):
     if ctype == "replace":
         repair_sys = (
             "You are an automated code repair tool.\n"
@@ -186,14 +185,14 @@ def code_repair(code, error, ctype, REPAIR_LLM, openai_api_key=None):
             openai_api_key=openai_api_key,
             model_str=f"{REPAIR_LLM}",
             system_prompt=repair_sys,
-            prompt=f"Provided here is the error: {error}\n\nProvided below is the code:\n\n{code}", temp=0.8)
+            prompt=f"Provided here is the error: {error}\n\nProvided below is the code:\n\n{code}", temp=0.8, base_url=base_url)
         return extract_prompt(model_resp, "python")
     elif ctype == "edit":
         repair_sys = (
             "You are an automated code repair tool.\n"
             "Your goal is to take in code and an error and repair the code to make sure the same error does not repeat itself, and also to remove any other potential errors from the code without affecting the code output.\n"
             "Your output should match the original code as closely as possible.\n"
-            
+
             "============= CODE EDITING TOOL =============\n"
             "You have access to a code editing tool. \n"
             "This tool allows you to replace lines indexed n through m (n:m) of the current code with as many lines of new code as you want to add. This removal is inclusive meaning that line n and m and everything between n and m is removed. This will be the primary way that you interact with code. \n"
@@ -206,17 +205,22 @@ def code_repair(code, error, ctype, REPAIR_LLM, openai_api_key=None):
             openai_api_key=openai_api_key,
             model_str=f"{REPAIR_LLM}",
             system_prompt=repair_sys,
-            prompt=f"Provided here is the error: {error}\n\nProvided below is the code:\n\n{code}", temp=0.2)
+            prompt=f"Provided here is the error: {error}\n\nProvided below is the code:\n\n{code}", temp=0.2, base_url=base_url)
         return model_resp
 
 
 class MLESolver:
-    def __init__(self, dataset_code, openai_api_key=None, notes=None, max_steps=10, insights=None, plan=None, llm_str=None):
-        if notes is None: self.notes = []
-        else: self.notes = notes
+    def __init__(self, dataset_code, openai_api_key=None, notes=None, max_steps=10, insights=None, plan=None,
+                 llm_str=None, base_url=''):
+        if notes is None:
+            self.notes = []
+        else:
+            self.notes = notes
         self.dataset_code = dataset_code
-        if plan is None: self.plan = ""
-        else: self.plan = plan
+        if plan is None:
+            self.plan = ""
+        else:
+            self.plan = plan
         self.llm_str = llm_str
         self.verbose = False
         self.max_codes = 2
@@ -230,6 +234,7 @@ class MLESolver:
         self.prev_code_ret = str()
         self.should_execute_code = True
         self.openai_api_key = openai_api_key
+        self.base_url = base_url
 
     def initial_solve(self):
         """
@@ -273,7 +278,8 @@ class MLESolver:
                 openai_api_key=self.openai_api_key,
                 model_str=self.model,
                 system_prompt=self.system_prompt(),
-                prompt=f"{err_hist}\nYou should now use ```REPLACE to create initial code to solve the challenge. Now please enter the ```REPLACE command below:\n ", temp=1.0)
+                prompt=f"{err_hist}\nYou should now use ```REPLACE to create initial code to solve the challenge. Now please enter the ```REPLACE command below:\n ",
+                temp=1.0, base_url=self.base_url)
             model_resp = self.clean_text(model_resp)
             cmd_str, code_lines, prev_code_ret, should_execute_code, score = self.process_command(model_resp)
             print(f"@@@ INIT ATTEMPT: Command Exec // Attempt {num_attempts}: ", str(cmd_str).replace("\n", " | "))
@@ -289,13 +295,16 @@ class MLESolver:
         self.prev_code_ret = None
         self.should_execute_code = False
         while True:
-            if len(self.commands) == 2: cmd_app_str = "You must output either the ```EDIT or ```REPLACE command immediately. "
-            else: cmd_app_str = ""
+            if len(self.commands) == 2:
+                cmd_app_str = "You must output either the ```EDIT or ```REPLACE command immediately. "
+            else:
+                cmd_app_str = ""
             model_resp = query_model(
                 openai_api_key=self.openai_api_key,
                 model_str=self.model,
                 system_prompt=self.system_prompt(),
-                prompt=f"The following is your history:{self.history_str()}\n\n{cmd_app_str}Now please enter a command: ", temp=1.0)
+                prompt=f"The following is your history:{self.history_str()}\n\n{cmd_app_str}Now please enter a command: ",
+                temp=1.0, base_url=self.base_url)
             model_resp = self.clean_text(model_resp)
             self.code_lines = copy(random.choice(self.best_codes)[0])
             cmd_str, code_lines, prev_code_ret, should_execute_code, score = self.process_command(model_resp)
@@ -303,10 +312,12 @@ class MLESolver:
             if len(self.st_history) > self.st_hist_len: self.st_history.pop(0)
             if score is not None:
                 if top_score is None:
-                    best_pkg = copy(code_lines), copy(prev_code_ret), copy(should_execute_code), copy(model_resp), copy(cmd_str)
+                    best_pkg = copy(code_lines), copy(prev_code_ret), copy(should_execute_code), copy(model_resp), copy(
+                        cmd_str)
                     top_score = score
                 elif score > top_score:
-                    best_pkg = copy(code_lines), copy(prev_code_ret), copy(should_execute_code), copy(model_resp), copy(cmd_str)
+                    best_pkg = copy(code_lines), copy(prev_code_ret), copy(should_execute_code), copy(model_resp), copy(
+                        cmd_str)
                     top_score = score
             print(f"@@@ Command Exec // Attempt {num_attempts}: ", str(cmd_str).replace("\n", " | "))
             print(f"$$$ Score: {score}")
@@ -329,10 +340,13 @@ class MLESolver:
         Provide a reflection on produced behavior for next execution
         @return: (str) language model-produced reflection
         """
-        code_strs = ("$"*40 + "\n\n").join([self.generate_code_lines(_code[0]) + f"\nCode Return {_code[1]}" for _code in self.best_codes])
+        code_strs = ("$" * 40 + "\n\n").join(
+            [self.generate_code_lines(_code[0]) + f"\nCode Return {_code[1]}" for _code in self.best_codes])
         code_strs = f"Please reflect on the following sets of code: {code_strs} and come up with generalizable insights that will help you improve your performance on this benchmark."
         syst = self.system_prompt(commands=False) + code_strs
-        return query_model(prompt="Please reflect on ideas for how to improve your current code. Examine the provided code and think very specifically (with precise ideas) on how to improve performance, which methods to use, how to improve generalization on the test set with line-by-line examples below:\n", system_prompt=syst, model_str=f"{self.llm_str}", openai_api_key=self.openai_api_key)
+        return query_model(
+            prompt="Please reflect on ideas for how to improve your current code. Examine the provided code and think very specifically (with precise ideas) on how to improve performance, which methods to use, how to improve generalization on the test set with line-by-line examples below:\n",
+            system_prompt=syst, model_str=f"{self.llm_str}", openai_api_key=self.openai_api_key, base_url=self.base_url)
 
     def process_command(self, model_resp):
         """
@@ -349,7 +363,7 @@ class MLESolver:
         should_execute_code = self.should_execute_code
         code_lines = copy(self.code_lines)
         remove_figures()
-        with suppress_stdout(): # shhh
+        with suppress_stdout():  # shhh
             for cmd in self.commands:
                 if cmd.matches_command(model_resp):
                     # attempt to execute the code edit command
@@ -364,12 +378,16 @@ class MLESolver:
                                 code_err = f"Return from executing code: {cmd_return[2]}"
                                 if cmd_return[0]:  # if success
                                     code_lines = copy(cmd_return[1])
-                                    score, cmd_str, is_valid = get_score(self.plan, "\n".join(code_lines), cmd_return[2], openai_api_key=self.openai_api_key, REWARD_MODEL_LLM=self.llm_str)
+                                    score, cmd_str, is_valid = get_score(self.plan, "\n".join(code_lines),
+                                                                         cmd_return[2],
+                                                                         openai_api_key=self.openai_api_key,
+                                                                         REWARD_MODEL_LLM=self.llm_str)
                                     if is_valid:
                                         failed = False
                                         break
                                     code_err += f"\nReturn from executing code on real test set {cmd_str}"
-                            repaired_code = code_repair(model_resp, code_err, REPAIR_LLM=self.llm_str, ctype="edit", openai_api_key=self.openai_api_key)
+                            repaired_code = code_repair(model_resp, code_err, REPAIR_LLM=self.llm_str, ctype="edit",
+                                                        openai_api_key=self.openai_api_key, base_url=self.base_url)
                             model_resp = repaired_code
                             print(f"     * Attempting repair // try {_tries}*")
                         if failed:
@@ -382,7 +400,7 @@ class MLESolver:
                             should_execute_code = True
                         return cmd_str, code_lines, prev_code_ret, should_execute_code, score
                     # attempt to execute the code replace command
-                    elif cmd.cmd_type == "CODE-replace": # DONE
+                    elif cmd.cmd_type == "CODE-replace":  # DONE
                         score = None
                         failed = True
                         code_err = str()
@@ -391,12 +409,16 @@ class MLESolver:
                             code_err = f"Return from executing code: {args[1]}"
                             if success:
                                 code_lines = copy(args[0])
-                                score, cmd_str, is_valid = get_score(self.plan, "\n".join(code_lines), args[1], openai_api_key=self.openai_api_key, REWARD_MODEL_LLM=self.llm_str)
+                                score, cmd_str, is_valid = get_score(self.plan, "\n".join(code_lines), args[1],
+                                                                     openai_api_key=self.openai_api_key,
+                                                                     REWARD_MODEL_LLM=self.llm_str)
                                 if is_valid:
                                     failed = False
                                     break
                                 code_err += f"\nReturn from executing code on real test set {cmd_str}"
-                            repaired_code = code_repair(extract_prompt(model_resp, "REPLACE", ), code_err, ctype="replace", openai_api_key=self.openai_api_key, REPAIR_LLM=self.llm_str)
+                            repaired_code = code_repair(extract_prompt(model_resp, "REPLACE", ), code_err,
+                                                        ctype="replace", openai_api_key=self.openai_api_key,
+                                                        REPAIR_LLM=self.llm_str, base_url=self.base_url)
                             repaired_code = f"```REPLACE\n{repaired_code}\n```"
                             model_resp = repaired_code
                             print(f"     * Attempting repair // try {_tries}*")
@@ -420,12 +442,13 @@ class MLESolver:
         """
         hist_str = ""
         for _hist in range(len(self.st_history)):
-            hist_str += f"-------- History ({len(self.st_history)-_hist} steps ago) -----\n"
-            hist_str += f"Because of the following response: {self.st_history[_hist][0]}\n" if len(self.st_history[_hist][0]) > 0 else ""
+            hist_str += f"-------- History ({len(self.st_history) - _hist} steps ago) -----\n"
+            hist_str += f"Because of the following response: {self.st_history[_hist][0]}\n" if len(
+                self.st_history[_hist][0]) > 0 else ""
             hist_str += f"and the following COMMAND response output: {self.st_history[_hist][3]}\n"
-            hist_str += f"With the following code used: {'#'*20}\n{self.st_history[_hist][2]}\n{'#'*20}\n\n"
+            hist_str += f"With the following code used: {'#' * 20}\n{self.st_history[_hist][2]}\n{'#' * 20}\n\n"
             hist_str += f"The environment feedback and reflection was as follows: {self.st_history[_hist][1]}\n"
-            hist_str += f"-------- End of history ({len(self.st_history)-_hist} steps ago) -------\n"
+            hist_str += f"-------- End of history ({len(self.st_history) - _hist} steps ago) -------\n"
         return hist_str
 
     def system_prompt(self, commands=True):
@@ -483,7 +506,8 @@ class MLESolver:
                 reflect_prompt = f"This is your code: {code_str}\n\nYour code returned the following error {code_return}. Please provide a detailed reflection on why this error was returned, which lines in the code caused this error, and exactly (line by line) how you hope to fix this in the next update. This step is mostly meant to reflect in order to help your future self fix the error better. Do not provide entirely new code but provide suggestions on how to fix the bug using LINE EDITS."
             elif os.path.exists("submission.csv"):
                 self.prev_working_code = copy(self.code_lines)
-                grade_return = get_score(self.plan, "\n".join(self.prev_working_code), code_return, openai_api_key=self.openai_api_key)[0]
+                grade_return = get_score(self.plan, "\n".join(self.prev_working_code), code_return,
+                                         openai_api_key=self.openai_api_key)[0]
                 print(f"@@@@ SUBMISSION: model score {grade_return}", REWARD_MODEL_LLM=self.llm_str)
                 f"Your code was properly submitted and you have just received a grade for your model.\nYour score was {grade_return}.\n\n"
                 reflect_prompt = f"This is your code: {code_str}\n\nYour code successfully returned a submission csv. Consider further improving your technique through advanced learning techniques, data augmentation, or hyperparamter tuning to increase the score. Please provide a detailed reflection on how to improve your performance, which lines in the code could be improved upon, and exactly (line by line) how you hope to improve this in the next update. This step is mostly meant to reflect in order to help your future self."
@@ -507,7 +531,8 @@ class MLESolver:
         @param code_str: (str) code string
         @return: (str) reflection string
         """
-        refl = query_model(prompt=reflect_prompt, system_prompt=self.system_prompt(commands=False), model_str=f"{self.llm_str}", openai_api_key=self.openai_api_key)
+        refl = query_model(prompt=reflect_prompt, system_prompt=self.system_prompt(commands=False),
+                           model_str=f"{self.llm_str}", openai_api_key=self.openai_api_key, base_url=self.base_url)
         return f"During the previous execution, the following code was run: \n\n{code_str}\n\nThis code returned the following: \n{code_return}\nThe following is your reflection from this feedback {refl}\n"
 
     def generate_dataset_descr_prompt(self):
@@ -518,7 +543,7 @@ class MLESolver:
         """
         return f"\n- The following dataset code will be added to the beginning of your code always, so this does not need to be rewritten: {self.dataset_code}"
 
-    def phase_prompt(self,):
+    def phase_prompt(self, ):
         """
         Describe system role and general tips for mle-solver
         @return: (str) system role
@@ -569,7 +594,3 @@ class MLESolver:
         elif self.should_execute_code:
             return execute_code("\n".join(self.code_lines))
         return "Changes have not yet been made to the code."
-
-
-
-

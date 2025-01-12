@@ -8,6 +8,7 @@ TOKENS_OUT = dict()
 
 encoding = tiktoken.get_encoding("cl100k_base")
 
+
 def curr_cost_est():
     costmap_in = {
         "gpt-4o": 2.50 / 1000000,
@@ -17,15 +18,18 @@ def curr_cost_est():
         "claude-3-5-sonnet": 3.00 / 1000000,
     }
     costmap_out = {
-        "gpt-4o": 10.00/ 1000000,
+        "gpt-4o": 10.00 / 1000000,
         "gpt-4o-mini": 0.6 / 1000000,
         "o1-preview": 60.00 / 1000000,
         "o1-mini": 12.00 / 1000000,
         "claude-3-5-sonnet": 12.00 / 1000000,
     }
-    return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
+    return sum([costmap_in[_] * TOKENS_IN[_] for _ in TOKENS_IN]) + sum(
+        [costmap_out[_] * TOKENS_OUT[_] for _ in TOKENS_OUT])
 
-def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
+
+def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0,
+                temp=None, print_cost=True, version="1.5", base_url=''):
     preloaded_api = os.getenv('OPENAI_API_KEY')
     if openai_api_key is None and preloaded_api is not None:
         openai_api_key = preloaded_api
@@ -36,6 +40,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
         os.environ["OPENAI_API_KEY"] = openai_api_key
     if anthropic_api_key is not None:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+    encoding=None
     for _ in range(tries):
         try:
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
@@ -124,17 +129,36 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     completion = client.chat.completions.create(
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
-
-            if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet"]:
-                encoding = tiktoken.encoding_for_model("gpt-4o")
-            else: encoding = tiktoken.encoding_for_model(model_str)
+            else:
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": prompt}]
+                client = OpenAI()
+                if base_url is not None and base_url != '':
+                    client.base_url = base_url
+                completion = client.chat.completions.create(
+                    model=f"{model_str}", messages=messages)
+                answer = completion.choices[0].message.content
+            try:
+                if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet"]:
+                    encoding = tiktoken.encoding_for_model("gpt-4o")
+                else:
+                    encoding = tiktoken.encoding_for_model(model_str)
+            except Exception as e:
+                pass
+            if encoding is None:
+                # set a default encoding to by pass the error for now.
+                encoding = tiktoken.encoding_for_model('gpt-4')
             if model_str not in TOKENS_IN:
                 TOKENS_IN[model_str] = 0
                 TOKENS_OUT[model_str] = 0
             TOKENS_IN[model_str] += len(encoding.encode(system_prompt + prompt))
             TOKENS_OUT[model_str] += len(encoding.encode(answer))
             if print_cost:
-                print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
+                try:
+                    print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
+                except Exception as e:
+                    pass
             return answer
         except Exception as e:
             print("Inference Exception:", e)
@@ -142,5 +166,4 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             continue
     raise Exception("Max retries: timeout")
 
-
-#print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))
+# print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))

@@ -11,7 +11,8 @@ DEFAULT_LLM_BACKBONE = "o1-mini"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
+    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}",
+                 notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5, base_url=''):
         """
         Initialize laboratory workflow
         @param research_topic: (str) description of research idea to explore
@@ -25,6 +26,7 @@ class LaboratoryWorkflow:
         self.max_steps = max_steps
         self.compile_pdf = compile_pdf
         self.openai_api_key = openai_api_key
+        self.base_url=base_url
         self.research_topic = research_topic
         self.model_backbone = agent_model_backbone
         self.num_papers_lit_review = num_papers_lit_review
@@ -79,11 +81,11 @@ class LaboratoryWorkflow:
 
         self.save = True
         self.verbose = True
-        self.reviewers = ReviewersAgent(model=self.model_backbone, notes=self.notes, openai_api_key=self.openai_api_key)
-        self.phd = PhDStudentAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
-        self.postdoc = PostdocAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
-        self.professor = ProfessorAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
-        self.ml_engineer = MLEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
+        self.reviewers = ReviewersAgent(model=self.model_backbone, notes=self.notes, openai_api_key=self.openai_api_key, base_url=self.base_url)
+        self.phd = PhDStudentAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key, base_url=self.base_url)
+        self.postdoc = PostdocAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key, base_url=self.base_url)
+        self.professor = ProfessorAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key, base_url=self.base_url)
+        self.ml_engineer = MLEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key, base_url=self.base_url)
 
         # remove previous files
         remove_figures()
@@ -240,7 +242,8 @@ class LaboratoryWorkflow:
         # instantiate mle-solver
         from papersolver import PaperSolver
         self.reference_papers = []
-        solver = PaperSolver(notes=report_notes, max_steps=self.papersolver_max_steps, plan=lab.phd.plan, exp_code=lab.phd.results_code, exp_results=lab.phd.exp_results, insights=lab.phd.interpretation, lit_review=lab.phd.lit_review, ref_papers=self.reference_papers, topic=research_topic, openai_api_key=self.openai_api_key, llm_str=self.model_backbone["report writing"], compile_pdf=compile_pdf)
+        solver = PaperSolver(notes=report_notes, max_steps=self.papersolver_max_steps, plan=lab.phd.plan, exp_code=lab.phd.results_code, exp_results=lab.phd.exp_results, insights=lab.phd.interpretation, lit_review=lab.phd.lit_review, ref_papers=self.reference_papers, topic=research_topic, openai_api_key=self.openai_api_key,
+                             llm_str=self.model_backbone["report writing"], compile_pdf=compile_pdf, base_url=self.base_url)
         # run initialization for solver
         solver.initial_solve()
         # run solver for N mle optimization steps
@@ -603,17 +606,24 @@ def parse_arguments():
         help='Total number of paper-solver steps'
     )
 
+    parser.add_argument(
+        '--base-url',
+        type=str,
+        default="",
+        help='Set to different url if you are using a custom server, e.g. http://localhost:11434 if using ollama, or http://localhost:8080/v1 if using llama.cpp.'
+    )
+
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_arguments()
-
     llm_backend = args.llm_backend
     human_mode = args.copilot_mode.lower() == "true"
     compile_pdf = args.compile_latex.lower() == "true"
     load_existing = args.load_existing.lower() == "true"
+    base_url=args.base_url
     try:
         num_papers_lit_review = int(args.num_papers_lit_review.lower())
     except Exception:
@@ -711,6 +721,7 @@ if __name__ == "__main__":
             num_papers_lit_review=num_papers_lit_review,
             papersolver_max_steps=papersolver_max_steps,
             mlesolver_max_steps=mlesolver_max_steps,
+            base_url=base_url
         )
 
     lab.perform_research()

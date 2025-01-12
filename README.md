@@ -78,6 +78,11 @@ To run Agent Laboratory in copilot mode, simply set the copilot-mode flag to `"t
 
 `python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true"`
 
+### Run with local LLM server
+
+`python ai_lab_repo.py --api-key "ollama" --llm-backend "qwen2.5-coder" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true" --base-url http://localhost:11434/v1`
+or 
+`python ai_lab_repo.py --api-key "llama.cpp" --llm-backend "qwen2.5-coder" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true" --base-url http://localhost:8080/v1`
 -----
 ## Tips for better research outcomes
 

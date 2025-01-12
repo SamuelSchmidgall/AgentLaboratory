@@ -132,28 +132,27 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}]
                 try:
-                    encoding = tiktoken.get_encoding("deepseek-chat")
+                    encoding = tiktoken.get_encoding("cl100k_base")
                 except KeyError:
                     raise Exception("Could not automatically map deepseek-chat to a tokeniser. Please use tiktoken.get_encoding to explicitly get the tokeniser you expect.")
                 if version == "0.28":
+                    raise Exception("Please upgrade your OpenAI version to use DeepSeek client")
+                else:
+                    deepseek_client = OpenAI(
+                        api_key=deepseek_api_key,
+                        base_url="https://api.deepseek.com/v1"
+                    )
                     if temp is None:
-                        completion = openai.ChatCompletion.create(
-                            model=f"{model_str}",  # engine = "deployment_name".
+                        completion = deepseek_client.chat.completions.create(
+                            model="deepseek-chat",
                             messages=messages
                         )
                     else:
-                        completion = openai.ChatCompletion.create(
-                            model=f"{model_str}",  # engine = "deployment_name".
-                            messages=messages, temperature=temp
+                        completion = deepseek_client.chat.completions.create(
+                            model="deepseek-chat",
+                            messages=messages,
+                            temperature=temp
                         )
-                else:
-                    client = OpenAI()
-                    if temp is None:
-                        completion = client.chat.completions.create(
-                            model="deepseek-chat-2024-07-18", messages=messages, )
-                    else:
-                        completion = client.chat.completions.create(
-                            model="deepseek-chat-2024-07-18", messages=messages, temperature=temp)
                 answer = completion.choices[0].message.content
 
             if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "deepseek-chat"]:

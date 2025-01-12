@@ -87,6 +87,20 @@ To run Agent Laboratory in copilot mode, simply set the copilot-mode flag to `"t
 `python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true"`
 
 -----
+
+## Docker Option
+
+1. Build the Docker image
+
+```bash docker build -t agentlab .```
+
+2. Run the container (Replace API_KEY with your actual API key)
+
+```bash docker run -it -v $(pwd)/research_dir:/app/research_dir agentlab --research-topic "your research topic" --llm-backend "deepseek-chat" --api-key "API_KEY"```
+
+Note: The research_dir will be mounted from your local machine, allowing you to access the generated files outside the container
+
+
 ## Tips for better research outcomes
 
 

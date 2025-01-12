@@ -1,0 +1,15 @@
+venv*
+.idea*
+tst*
+state*
+junk/*
+huggingface_*
+junk/logs
+papers*
+hf*
+junk/data/*
+research_dir/*
+.DS_Store
+state_saves/*
+__pycache__/*
+Figure*.png

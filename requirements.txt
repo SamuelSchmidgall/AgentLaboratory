@@ -66,7 +66,6 @@ murmurhash==1.0.11
 namex==0.0.8
 nest-asyncio==1.6.0
 networkx==3.2.1
-NEURON==8.2.4
 nltk==3.9.1
 numpy==2.0.2
 openai==1.55.1

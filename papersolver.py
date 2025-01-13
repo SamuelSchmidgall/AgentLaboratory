@@ -244,22 +244,14 @@ Please make sure the abstract reads smoothly and is well-motivated. This should 
 
 class PaperSolver:
     def __init__(self, llm_str, notes=None, max_steps=10, insights=None, plan=None, exp_code=None, exp_results=None, lit_review=None, ref_papers=None, topic=None, openai_api_key=None, compile_pdf=True):
-        if notes is None: self.notes = []
-        else: self.notes = notes
-        if plan is None: self.plan = ""
-        else: self.plan = plan
-        if exp_code is None: self.exp_code = ""
-        else: self.exp_code = exp_code
-        if exp_results is None: self.exp_results = ""
-        else: self.exp_results = exp_results
-        if lit_review is None: self.lit_review = ""
-        else: self.lit_review = lit_review
-        if insights is None: self.insights = ""
-        else: self.insights = insights
-        if ref_papers is None: self.ref_papers = ""
-        else: self.ref_papers = ref_papers
-        if topic is None: self.topic = ""
-        else: self.topic = topic
+        self.notes = [] if notes is None else: self.notes notes
+        self.plan  = "" if plan is None else plan
+        self.exp_code = ""  if exp_code is None else exp_code
+        self.exp_results = "" if exp_results is None else exp_results
+        self.lit_review = "" if lit_review is None else lit_review
+        self.insights = "" if insights is None else insights
+        self.ref_papers = "" if ref_papers is None else ref_papers
+        self.topic = "" if topic is None else topic
         self.compile_pdf = compile_pdf
         self.llm_str = llm_str
         self.notes = notes

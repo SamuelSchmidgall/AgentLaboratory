@@ -387,7 +387,7 @@ class LaboratoryWorkflow:
             if "```python" in resp:
                 code = extract_prompt(resp, "python")
                 code = self.ml_engineer.dataset_code + "\n" + code
-                code_resp = execute_code(code, timeout=120)
+                code_resp = execute_code(code, timeout=340)
                 ml_command = f"Code produced by the ML agent:\n{code}"
                 ml_feedback += f"\nCode Response: {code_resp}\n"
                 if self.verbose: print("!"*100, "\n", f"CODE RESPONSE: {code_resp}")
@@ -644,23 +644,38 @@ if __name__ == "__main__":
         {"phases": ["plan formulation"],
          "note": f"You should come up with a plan for TWO experiments."},
 
+        {"phases": ["plan formulation"],
+        "note": "As I later plan to conduct interview help me prepare interview guids, but do not come up with an entire interview. I want to conduct them myself."},
+
+        {"phases": ["plan formulation"],
+        "note": "My first main research question is: To what extent does communication about reality dating shows on social media platforms influence recipients' reception and evaluation of reality dating shows?."},
+
+        {"phases": ["plan formulation"],
+        "note": "My second main research question is: To what extent does the development of parasocial relationships through social media platforms influence the reception and opinion formation of recipients regarding reality dating shows?."},
+
+         {"phases": ["plan formulation"],
+        "note": "To answer my RQs I plan to split my thesis into 2 parts. The first has the topic: Relationship between reality dating shows and second screen communication on social media platforms. To evaluate this topic I want to answer the following sub questions:RQ1: To what extent does communication about reality dating shows (RDS) on social media platforms (SMPs) influence recipients' reception and evaluation of RDS? RQ1a: Which topics are at the center of communication on SMPs about RDS and do these differ depending on the phase of second screen communication? RQ1b: To what extent does second screen communication on SMPs influence the individual reception and opinion formation of recipients regarding RDS? "},
+       
+        {"phases": ["plan formulation"],
+        "note": "To answer my RQs I plan to split my thesis into 2 parts. In the second part the following RQs should be answered: RQ2: To what extent does the development of parasocial relationships (PSB) through SMPs influence the reception and opinion formation of recipients regarding RDS? RQ2a: To what extent do recipients perceive the development of parasocial relationships with RDS candidates through SMPs? RQ2b: What role do recipients attribute to SMPs in building PSBs?"},
+        
+        {"phases": ["plan formulation", "data preparation"],
+         "note": "When planning my thesis also take these notes into account: Method: qualitative guided interviews with people who regularly receive RDS on streaming platforms and use SMPs for second screen communication about these shows Give me criteria for material selection (which reality dating shows/social media platforms are included?) definitely include Definition of second screen communication and division into different phases (preliminary, parallel, follow-up communication)"},
+
         {"phases": ["plan formulation", "data preparation", "running experiments"],
-         "note": "Please use gpt-4o-mini for your experiments."},
+         "note": "Please use gpt-4o-mini for your planning."},
 
-        {"phases": ["running experiments"],
-         "note": f'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
+        #{"phases": ["running experiments"],
+        # "note": f"You have access to only gpt-4o-mini using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
 
-        {"phases": ["running experiments"],
-         "note": f"You have access to only gpt-4o-mini using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
+        #{"phases": ["running experiments"],
+        # "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
 
-        {"phases": ["running experiments"],
-         "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
+        #{"phases": ["data preparation", "running experiments"],
+        # "note": "You are running on a MacBook laptop. You can use 'mps' with PyTorch"},
 
-        {"phases": ["data preparation", "running experiments"],
-         "note": "You are running on a MacBook laptop. You can use 'mps' with PyTorch"},
-
-        {"phases": ["data preparation", "running experiments"],
-         "note": "Generate figures with very colorful and artistic design."},
+        #{"phases": ["data preparation", "running experiments"],
+        # "note": "Generate figures with very colorful and artistic design."},
     ]
 
     task_notes_LLM.append(

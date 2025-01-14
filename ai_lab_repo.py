@@ -139,6 +139,7 @@ class LaboratoryWorkflow:
         Loop through all research phases
         @return: None
         """
+        create_visualization_interface()
         for phase, subtasks in self.phases:
             phase_start_time = time.time()  # Start timing the phase
             if self.verbose: print(f"{'*'*50}\nBeginning phase: {phase}\n{'*'*50}")
@@ -198,6 +199,8 @@ class LaboratoryWorkflow:
                 phase_duration = phase_end_time - phase_start_time
                 print(f"Subtask '{subtask}' completed in {phase_duration:.2f} seconds.")
                 self.statistics_per_phase[subtask]["time"] = phase_duration
+                if os.path.exists("agent_logs/mle_solver_latest.json"):
+                    print(f"\nVisualization available at research_dir/visualization.html\n")
 
     def report_refinement(self):
         """
@@ -526,6 +529,33 @@ class LaboratoryWorkflow:
             else: print("Invalid response, type Y or N")
         return False
 
+def create_visualization_interface():
+    """Create a simple React interface for visualizations"""
+    visualization_html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Agent Laboratory Visualization</title>
+        <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+        <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="text/javascript">
+            import { AgentVisualizer } from './components/AgentVisualizer';
+
+            ReactDOM.render(
+                React.createElement(AgentVisualizer, { agentName: "mle_solver" }),
+                document.getElementById('root')
+            );
+        </script>
+    </body>
+    </html>
+    """
+
+    # Save the visualization interface
+    with open("research_dir/visualization.html", "w") as f:
+        f.write(visualization_html)
 
 
 def parse_arguments():
@@ -728,9 +758,3 @@ if __name__ == "__main__":
         )
 
     lab.perform_research()
-
-
-
-
-
-

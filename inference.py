@@ -163,7 +163,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
                 encoding = tiktoken.encoding_for_model("gpt-4o")
             elif model_str in ["deepseek-chat"]:
-                encoding = tiktoken.encoding_for_model("cl100k_base")
+                encoding = tiktoken.get_encoding("cl100k_base")
             else:
                 encoding = tiktoken.encoding_for_model(model_str)
             if model_str not in TOKENS_IN:

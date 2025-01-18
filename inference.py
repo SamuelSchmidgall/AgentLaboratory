@@ -40,6 +40,8 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
         os.environ["OPENAI_API_KEY"] = openai_api_key
     if anthropic_api_key is not None:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+    base_url = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
+    openai.base_url = base_url
     for _ in range(tries):
         try:
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":

@@ -14,7 +14,7 @@ def curr_cost_est():
         "gpt-4o-mini": 0.150 / 1000000,
         "o1-preview": 15.00 / 1000000,
         "o1-mini": 3.00 / 1000000,
-        "claude-3-5-sonnet": 3.00 / 1000000,
+        "claude-3-5-sonnet": 3.00 / 1000000,  # Updated model string
         "deepseek-chat": 1.00 / 1000000,
         "o1": 15.00 / 1000000,
     }
@@ -23,7 +23,7 @@ def curr_cost_est():
         "gpt-4o-mini": 0.6 / 1000000,
         "o1-preview": 60.00 / 1000000,
         "o1-mini": 12.00 / 1000000,
-        "claude-3-5-sonnet": 12.00 / 1000000,
+        "claude-3-5-sonnet": 12.00 / 1000000,  # Updated model string
         "deepseek-chat": 5.00 / 1000000,
         "o1": 60.00 / 1000000,
     }
@@ -67,10 +67,10 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                         completion = client.chat.completions.create(
                             model="gpt-4o-mini-2024-07-18", messages=messages, temperature=temp)
                 answer = completion.choices[0].message.content
-            elif model_str == "claude-3.5-sonnet":
+            elif model_str == "claude-3-5-sonnet":  # Updated check for model
                 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
                 message = client.messages.create(
-                    model="claude-3-5-sonnet-latest",
+                    model="claude-3-5-sonnet",  # Standardized model name
                     system=system_prompt,
                     messages=[{"role": "user", "content": prompt}])
                 answer = json.loads(message.to_json())["content"][0]["text"]
@@ -160,7 +160,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
 
-            if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
+            if model_str in ["o1-preview", "o1-mini", "claude-3-5-sonnet", "o1"]:  # Updated model name
                 encoding = tiktoken.encoding_for_model("gpt-4o")
             elif model_str in ["deepseek-chat"]:
                 encoding = tiktoken.encoding_for_model("cl100k_base")
@@ -179,6 +179,5 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             time.sleep(timeout)
             continue
     raise Exception("Max retries: timeout")
-
 
 #print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))

@@ -16,14 +16,15 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 import traceback
 import concurrent.futures
-
+import psutil
+import subprocess
 
 class HFDataSearch:
     def __init__(self, like_thr=3, dwn_thr=50) -> None:
         """
         Class for finding relevant huggingface datasets
-        :param like_thr:
-        :param dwn_thr:
+        :param like_thr: threshold of 'likes'
+        :param dwn_thr: threshold of 'downloads'
         """
         self.dwn_thr = dwn_thr
         self.like_thr = like_thr
@@ -103,21 +104,24 @@ class HFDataSearch:
         cosine_similarities = linear_kernel(query_vector, self.description_vectors).flatten()
         # Normalize cosine similarities
         cosine_similarities_norm = self._normalize(cosine_similarities)
+
         # Compute final scores
         final_scores = (
-                sim_w * cosine_similarities_norm +
-                like_w * self.likes_norm +
-                dwn_w * self.downloads_norm
+            sim_w * cosine_similarities_norm +
+            like_w * self.likes_norm +
+            dwn_w * self.downloads_norm
         )
+
         # Get top N indices
         top_indices = final_scores.argsort()[-N:][::-1]
         # Convert indices to Python ints
         top_indices = [int(i) for i in top_indices]
         top_datasets = [self.ds[i] for i in top_indices]
-        # check if dataset has a test & train set
-        has_test_set = list()
-        has_train_set = list()
-        ds_size_info = list()
+
+        # Check if dataset has a test & train set; gather size info
+        has_test_set = []
+        has_train_set = []
+        ds_size_info = []
         for i in top_indices:
             try:
                 dbuilder = load_dataset_builder(self.ds[i]["id"], trust_remote_code=True).info
@@ -132,10 +136,11 @@ class HFDataSearch:
                 has_train_set.append(False)
                 ds_size_info.append((None, None, None, None))
                 continue
-            # Print number of examples for
+
             has_test, has_train = "test" in dbuilder.splits, "train" in dbuilder.splits
             has_test_set.append(has_test)
             has_train_set.append(has_train)
+
             test_dwn_size, test_elem_size = None, None
             train_dwn_size, train_elem_size = None, None
             if has_test:
@@ -144,7 +149,10 @@ class HFDataSearch:
             if has_train:
                 train_dwn_size = bytes2human(dbuilder.splits["train"].num_bytes)
                 train_elem_size = dbuilder.splits["train"].num_examples
+
             ds_size_info.append((test_dwn_size, test_elem_size, train_dwn_size, train_elem_size))
+
+        # Attach metadata to the top_datasets
         for _i in range(len(top_datasets)):
             top_datasets[_i]["has_test_set"] = has_test_set[_i]
             top_datasets[_i]["has_train_set"] = has_train_set[_i]
@@ -152,6 +160,7 @@ class HFDataSearch:
             top_datasets[_i]["test_element_size"] = ds_size_info[_i][1]
             top_datasets[_i]["train_download_size"] = ds_size_info[_i][2]
             top_datasets[_i]["train_element_size"] = ds_size_info[_i][3]
+
         return top_datasets
 
     def results_str(self, results):
@@ -160,7 +169,7 @@ class HFDataSearch:
         :param results: (list(dict)) list of results from search
         :return: (list(str)) list of results in human-readable format
         """
-        result_strs = list()
+        result_strs = []
         for result in results:
             res_str = f"Dataset ID: {result['id']}\n"
             res_str += f"Description: {result['description']}\n"
@@ -175,27 +184,43 @@ class HFDataSearch:
             result_strs.append(res_str)
         return result_strs
 
-
 class SemanticScholarSearch:
     def __init__(self):
         self.sch_engine = SemanticScholar(retry=False)
 
     def find_papers_by_str(self, query, N=10):
-        paper_sums = list()
-        results = self.sch_engine.search_paper(query, limit=N, min_citation_count=3, open_access_pdf=True)
+        """
+        Finds top-N papers from semantic scholar
+        :param query: str
+        :param N: number of results
+        :return: list of string summaries
+        """
+        paper_sums = []
+        results = self.sch_engine.search_paper(
+            query, 
+            limit=N, 
+            min_citation_count=3, 
+            open_access_pdf=True
+        )
         for _i in range(len(results)):
-            paper_sum = f'Title: {results[_i].title}\n'
-            paper_sum += f'Abstract: {results[_i].abstract}\n'
-            paper_sum += f'Citations: {results[_i].citationCount}\n'
-            paper_sum += f'Release Date: year {results[_i].publicationDate.year}, month {results[_i].publicationDate.month}, day {results[_i].publicationDate.day}\n'
-            paper_sum += f'Venue: {results[_i].venue}\n'
-            paper_sum += f'Paper ID: {results[_i].externalIds["DOI"]}\n'
+            paper_sum = f"Title: {results[_i].title}\n"
+            paper_sum += f"Abstract: {results[_i].abstract}\n"
+            paper_sum += f"Citations: {results[_i].citationCount}\n"
+            paper_sum += (
+                f"Release Date: year {results[_i].publicationDate.year}, "
+                f"month {results[_i].publicationDate.month}, "
+                f"day {results[_i].publicationDate.day}\n"
+            )
+            paper_sum += f"Venue: {results[_i].venue}\n"
+            paper_sum += f"Paper ID: {results[_i].externalIds['DOI']}\n"
             paper_sums.append(paper_sum)
         return paper_sums
 
     def retrieve_full_paper_text(self, query):
+        """
+        NOTE: Not implemented in this example
+        """
         pass
-
 
 class ArxivSearch:
     def __init__(self):
@@ -203,43 +228,45 @@ class ArxivSearch:
         self.sch_engine = arxiv.Client()
         
     def _process_query(self, query: str) -> str:
-        """Process query string to fit within MAX_QUERY_LENGTH while preserving as much information as possible"""
+        """
+        Process query string to fit within MAX_QUERY_LENGTH 
+        while preserving as much info as possible
+        """
         MAX_QUERY_LENGTH = 300
-        
         if len(query) <= MAX_QUERY_LENGTH:
             return query
-        
+
         # Split into words
         words = query.split()
         processed_query = []
         current_length = 0
-        
+
         # Add words while staying under the limit
-        # Account for spaces between words
         for word in words:
-            # +1 for the space that will be added between words
             if current_length + len(word) + 1 <= MAX_QUERY_LENGTH:
                 processed_query.append(word)
                 current_length += len(word) + 1
             else:
                 break
-            
         return ' '.join(processed_query)
     
     def find_papers_by_str(self, query, N=20):
+        """
+        Finds top-N relevant arXiv papers
+        """
         processed_query = self._process_query(query)
         max_retries = 3
         retry_count = 0
-        
+
         while retry_count < max_retries:
             try:
                 search = arxiv.Search(
                     query="abs:" + processed_query,
                     max_results=N,
-                    sort_by=arxiv.SortCriterion.Relevance)
+                    sort_by=arxiv.SortCriterion.Relevance
+                )
 
-                paper_sums = list()
-                # `results` is a generator; you can iterate over its elements one by one...
+                paper_sums = []
                 for r in self.sch_engine.results(search):
                     paperid = r.pdf_url.split("/")[-1]
                     pubdate = str(r.published).split(" ")[0]
@@ -251,148 +278,179 @@ class ArxivSearch:
                     paper_sums.append(paper_sum)
                 time.sleep(2.0)
                 return "\n".join(paper_sums)
-                
+
             except Exception as e:
                 retry_count += 1
                 if retry_count < max_retries:
-                    # 递增延时
+                    # Exponential-ish back-off
                     time.sleep(2 * retry_count)
                     continue
-                
+        
+        # If unsuccessful
         return None
 
     def retrieve_full_paper_text(self, query):
-        pdf_text = str()
+        """
+        Download and extract full text from arXiv PDF
+        """
+        pdf_text = ""
+        # Attempt to get single result with the provided paper ID
         paper = next(arxiv.Client().results(arxiv.Search(id_list=[query])))
-        # Download the PDF to the PWD with a custom filename.
+        
+        # Download the PDF to a local file
         paper.download_pdf(filename="downloaded-paper.pdf")
-        # creating a pdf reader object
-        reader = PdfReader('downloaded-paper.pdf')
-        # Iterate over all the pages
+
+        # Create a pdf reader object
+        reader = PdfReader("downloaded-paper.pdf")
+
+        # Iterate over pages
         for page_number, page in enumerate(reader.pages, start=1):
-            # Extract text from the page
             try:
                 text = page.extract_text()
-            except Exception as e:
+            except Exception:
                 os.remove("downloaded-paper.pdf")
                 time.sleep(2.0)
                 return "EXTRACTION FAILED"
 
-            # Do something with the text (e.g., print it)
             pdf_text += f"--- Page {page_number} ---"
             pdf_text += text
             pdf_text += "\n"
+
         os.remove("downloaded-paper.pdf")
         time.sleep(2.0)
         return pdf_text
 
-"""
-import multiprocessing
-import sys
-import io
-import traceback
 
-def execute_code(code_str, timeout=180):
-    if "load_dataset('pubmed" in code_str:
-        return "pubmed Download took way too long. Program terminated"
-
-    def run_code(queue):
-        # Redirect stdout to capture print outputs
-        output_capture = io.StringIO()
-        sys.stdout = output_capture
-
-        try:
-            exec_globals = {}
-            exec(code_str, exec_globals)
-        except Exception as e:
-            output_capture.write(f"[CODE EXECUTION ERROR]: {str(e)}\n")
-            traceback.print_exc(file=output_capture)
-        finally:
-            # Put the output in the queue
-            queue.put(output_capture.getvalue())
-            # Restore stdout
-            sys.stdout = sys.__stdout__
-
-    # Create a multiprocessing Queue to capture the output
-    queue = multiprocessing.Queue()
-    # Create a new Process
-    process = multiprocessing.Process(target=run_code, args=(queue,))
-    process.start()
-    # Wait for the process to finish or timeout
-    process.join(timeout)
-
-    if process.is_alive():
-        process.terminate()
-        process.join()
-        return f"[CODE EXECUTION ERROR]: Code execution exceeded the timeout limit of {timeout} seconds. You must reduce the time complexity of your code."
-    else:
-        # Retrieve the output from the queue
-        output = queue.get()
-        return output
-
-"""
-
-import io
-import sys
-import traceback
-import concurrent.futures
-
-
-
-import multiprocessing
-import io
-import sys
-import traceback
-import multiprocessing
-import io
-import sys
-import traceback
-
-
-def execute_code(code_str, timeout=60, MAX_LEN=1000):
-    #print(code_str)
-
-    # prevent plotting errors
+def execute_code(
+    code_str,
+    max_total_time=7200,   # Hard limit on total runtime (seconds)
+    max_idle_time=60,      # If no CPU usage / no prints for this many secs, kill
+    max_stdout_len=2000
+):
+    """
+    Execute code in a separate subprocess with:
+      1) absolute time limit (max_total_time)
+      2) idle time limit (max_idle_time) based on CPU usage
+      3) capture stdout (limited by max_stdout_len)
+      4) gracefully handle zombie processes or processes that vanish
+    """
     import matplotlib
-    matplotlib.use('Agg')  # Use the non-interactive Agg backend
+    matplotlib.use('Agg')  # Use a non-interactive backend
     import matplotlib.pyplot as plt
 
-    # Preventing execution of certain resource-intensive datasets
+    # Basic checks
     if "load_dataset('pubmed" in code_str:
         return "[CODE EXECUTION ERROR] pubmed Download took way too long. Program terminated"
     if "exit(" in code_str:
-        return "[CODE EXECUTION ERROR] The exit() command is not allowed you must remove this."
-    #print(code_str)
-    # Capturing the output
+        return "[CODE EXECUTION ERROR] The exit() command is not allowed; please remove it."
+
+    temp_filename = "temp_script.py"
+    with open(temp_filename, "w", encoding="utf-8") as f:
+        f.write(code_str)
+
+    start_time = time.time()
     output_capture = io.StringIO()
-    sys.stdout = output_capture
 
-    # Create a new global context for exec
-    exec_globals = globals()
+    process = subprocess.Popen(
+        [sys.executable, temp_filename],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        universal_newlines=True
+    )
 
-    def run_code():
+    proc_psutil = psutil.Process(process.pid)
+    last_output_time = time.time()
+    last_cpu_check_time = time.time()
+    kill_reason = None
+
+    # For versions of psutil which do have STATUS_ZOMBIE:
+    # We'll prefer that, else fallback to the literal "zombie".
+    ZOMBIE_STRING = getattr(psutil, "STATUS_ZOMBIE", "zombie").lower()
+
+    while True:
+        # 1) If the process ended, break the loop
+        if process.poll() is not None:
+            break
+
+        # 2) Read any line from stdout
         try:
-            # Executing the code in the global namespace
-            exec(code_str, exec_globals)
-        except Exception as e:
-            output_capture.write(f"[CODE EXECUTION ERROR]: {str(e)}\n")
-            traceback.print_exc(file=output_capture)
+            line = process.stdout.readline()
+        except Exception:
+            line = None
 
-    try:
-        # Running code in a separate thread with a timeout
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_code)
-            future.result(timeout=timeout)
-    except concurrent.futures.TimeoutError:
-        return f"[CODE EXECUTION ERROR]: Code execution exceeded the timeout limit of {timeout} seconds. You must reduce the time complexity of your code."
-    except Exception as e:
-        return f"[CODE EXECUTION ERROR]: {str(e)}"
-    finally:
-        # Restoring standard output
-        sys.stdout = sys.__stdout__
+        if line:
+            output_capture.write(line)
+            last_output_time = time.time()
 
-    # Returning the captured output
-    return output_capture.getvalue()[:MAX_LEN]
+        # 3) CPU usage check every 2 seconds
+        if (time.time() - last_cpu_check_time) > 2.0:
+            last_cpu_check_time = time.time()
 
+            # (a) If process is not running => presumably done or zombie
+            if not proc_psutil.is_running():
+                kill_reason = "Process ended or unknown state"
+                break
+
+            # (b) Attempt to get the string status
+            try:
+                # e.g. "running", "sleeping", "zombie", etc.
+                status_str = proc_psutil.status().lower()
+            except psutil.Error:
+                # If we can't retrieve status, assume it's gone
+                kill_reason = "Could not retrieve process status"
+                process.kill()
+                break
+
+            # If status is "zombie", kill it
+            if status_str == ZOMBIE_STRING:
+                kill_reason = "Process is zombie"
+                process.kill()
+                break
+
+            # (c) Try CPU usage
+            try:
+                cpu_usage = proc_psutil.cpu_percent(interval=0.1)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                kill_reason = "Process is gone or cannot be accessed"
+                process.kill()
+                break
+
+            # If usage > 1%, consider it active
+            if cpu_usage > 1.0:
+                last_output_time = time.time()
+
+        # 4) Idle check
+        if (time.time() - last_output_time) > max_idle_time:
+            kill_reason = f"Idle for {max_idle_time} seconds."
+            process.kill()
+            break
+
+        # 5) Total time check
+        if (time.time() - start_time) > max_total_time:
+            kill_reason = f"Exceeded total runtime of {max_total_time} seconds."
+            process.kill()
+            break
+
+        time.sleep(0.05)  # Short pause
+
+    # 6) Drain leftover stdout
+    if process.poll() is not None:
+        leftover = process.stdout.read()
+        if leftover:
+            output_capture.write(leftover)
+
+    process.stdout.close()
+    process.wait()
+
+    # 7) Remove temp file if desired
+    if os.path.exists(temp_filename):
+        os.remove(temp_filename)
+
+    # 8) Attach kill_reason to logs if any
+    output = output_capture.getvalue()
+    if kill_reason:
+        output += f"\n[CODE EXECUTION STOPPED]: {kill_reason}\n"
+
+    return output[:max_stdout_len]
 
 

@@ -486,7 +486,7 @@ class MLESolver:
                 grade_return = get_score(self.plan, "\n".join(self.prev_working_code), code_return, openai_api_key=self.openai_api_key)[0]
                 print(f"@@@@ SUBMISSION: model score {grade_return}", REWARD_MODEL_LLM=self.llm_str)
                 f"Your code was properly submitted and you have just received a grade for your model.\nYour score was {grade_return}.\n\n"
-                reflect_prompt = f"This is your code: {code_str}\n\nYour code successfully returned a submission csv. Consider further improving your technique through advanced learning techniques, data augmentation, or hyperparamter tuning to increase the score. Please provide a detailed reflection on how to improve your performance, which lines in the code could be improved upon, and exactly (line by line) how you hope to improve this in the next update. This step is mostly meant to reflect in order to help your future self."
+                reflect_prompt = f"This is your code: {code_str}\n\nYour code successfully returned a submission csv. Consider further improving your technique through advanced learning techniques, data augmentation, or hyperparameter tuning to increase the score. Please provide a detailed reflection on how to improve your performance, which lines in the code could be improved upon, and exactly (line by line) how you hope to improve this in the next update. This step is mostly meant to reflect in order to help your future self."
 
                 for file in os.listdir("."):
                     if file.endswith(".csv"):

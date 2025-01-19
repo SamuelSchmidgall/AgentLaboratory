@@ -4,11 +4,10 @@ from copy import deepcopy
 from common_imports import *
 from abc import abstractmethod
 
-
 from tools import *
 from inference import *
 from pathlib import Path
-
+from visualization import VisualizationManager
 
 from contextlib import contextmanager
 import sys, os
@@ -56,12 +55,6 @@ class Command:
         pass
 
 
-"""
-@@@@@@@@@@@@@@@@@@
-@@ CODING TOOLS @@
-@@@@@@@@@@@@@@@@@@
-"""
-
 class Replace(Command):
     def __init__(self):
         super().__init__()
@@ -76,7 +69,6 @@ class Replace(Command):
         )
 
     def execute_command(self, *args) -> str:
-        # args[0] -> new code
         args = args[0]
         return args[0]
 
@@ -90,7 +82,6 @@ class Replace(Command):
         code_ret = execute_code(code_exec)
         if "[CODE EXECUTION ERROR]" in code_ret: return False, (None, code_ret,)
         return True, (new_code.split("\n"), code_ret)
-
 
 
 class Edit(Command):
@@ -107,11 +98,6 @@ class Edit(Command):
         )
 
     def execute_command(self, *args) -> str:
-        # args[0] -> N (int)
-        # args[1] -> M (int)
-        # args[2] -> old code
-        # args[3] -> new lines to replace
-        # args[4] -> new lines to replace
         try:
             args = args[0]
             current_code = args[2]
@@ -124,7 +110,7 @@ class Edit(Command):
             new_code = "\n".join(current_code)
             code_exec = f"{args[4]}\n{new_code}"
             code_ret = execute_code(code_exec)
-            if "CODE EXECUTION ERROR" in code_ret: return (False, None, code_ret)
+            if "[CODE EXECUTION ERROR]" in code_ret: return (False, None, code_ret)
             return (True, current_code, code_ret)
         except Exception as e:
             return (False, None, str(e))
@@ -148,68 +134,6 @@ class Edit(Command):
             return False, (None, None, None, None, None)
 
 
-def get_score(outlined_plan, code, code_return, REWARD_MODEL_LLM, attempts=3, openai_api_key=None):
-    e = str()
-    for _attempt in range(attempts):
-        try:
-            # todo: have a reward function here
-            sys = (
-                f"You are a professor agent who is serving as an expert reward model that can read a research plan, research code, and code output and are able to determine how well a model followed the plan, built the code, and got the proper output scored from 0 to 1 as a float.\n\n"
-                f"You must structure your score exactly in the following way: ```SCORE\n<score here>\n``` where SCORE is just the word score, <score here> is a floating point number between 0 and 1 representing how well the model followed the plan, built the code, and got the proper output."
-            )
-            scoring = query_model(
-                model_str=f"{REWARD_MODEL_LLM}",
-                system_prompt=sys,
-                openai_api_key=openai_api_key,
-                prompt=(
-                    f"Outlined in the following text is the research plan that the machine learning engineer was tasked with building: {outlined_plan}\n\n"
-                    f"The following text is the research code that the model produced: \n{code}\n\n"
-                    f"The following is the output from the model: {code_return}\n\n"), temp=0.6)
-            performance = extract_prompt(text=scoring, word="SCORE")
-            performance = float(performance)
-            return performance, f"The performance of your submission is: {performance}", True
-        except Exception as e:
-            return None, str(e), False
-    return 0, e
-
-
-def code_repair(code, error, ctype, REPAIR_LLM, openai_api_key=None):
-    if ctype == "replace":
-        repair_sys = (
-            "You are an automated code repair tool.\n"
-            "Your goal is to take in code and an error and repair the code to make sure the same error does not repeat itself, and also to remove any other potential errors from the code without affecting the code output.\n"
-            "Your output should match the original code as closely as possible.\n"
-            "You must wrap the code in the following ```python\n<code here>\n```\n"
-            "Do not forget the opening ```python and the closing ```."
-        )
-        model_resp = query_model(
-            openai_api_key=openai_api_key,
-            model_str=f"{REPAIR_LLM}",
-            system_prompt=repair_sys,
-            prompt=f"Provided here is the error: {error}\n\nProvided below is the code:\n\n{code}", temp=0.8)
-        return extract_prompt(model_resp, "python")
-    elif ctype == "edit":
-        repair_sys = (
-            "You are an automated code repair tool.\n"
-            "Your goal is to take in code and an error and repair the code to make sure the same error does not repeat itself, and also to remove any other potential errors from the code without affecting the code output.\n"
-            "Your output should match the original code as closely as possible.\n"
-            
-            "============= CODE EDITING TOOL =============\n"
-            "You have access to a code editing tool. \n"
-            "This tool allows you to replace lines indexed n through m (n:m) of the current code with as many lines of new code as you want to add. This removal is inclusive meaning that line n and m and everything between n and m is removed. This will be the primary way that you interact with code. \n"
-            "You can edit code using the following command: ```EDIT N M\n<new lines to replace old lines>\n``` EDIT is the word EDIT, N is the first line index you want to replace and M the the last line index you want to replace (everything inbetween will also be removed), and <new lines to replace old lines> will be the new code that is replacing the old code. Before changing the existing code to be your new code, your new code will be tested and if it returns an error it will not replace the existing code.\n"
-            "Please use the code editing tool to fix this code."
-            "Do not forget the opening ```EDIT N M and the closing ```."
-            "Your output should look like the following\n\n```EDIT N M\n<new lines to replace old lines>\n```"
-        )
-        model_resp = query_model(
-            openai_api_key=openai_api_key,
-            model_str=f"{REPAIR_LLM}",
-            system_prompt=repair_sys,
-            prompt=f"Provided here is the error: {error}\n\nProvided below is the code:\n\n{code}", temp=0.2)
-        return model_resp
-
-
 class MLESolver:
     def __init__(self, dataset_code, openai_api_key=None, notes=None, max_steps=10, insights=None, plan=None, llm_str=None):
         if notes is None: self.notes = []
@@ -231,14 +155,15 @@ class MLESolver:
         self.should_execute_code = True
         self.openai_api_key = openai_api_key
 
+        # Initialize visualization manager
+        self.viz_manager = VisualizationManager()
+        self.logger = self.viz_manager.get_logger("mle_solver")
+
     def initial_solve(self):
         """
         Initialize the solver and get an initial set of code and a return
         @return: None
         """
-        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-        # @@ Initial CodeGen Commands @@
-        # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
         self.best_score = None
         self.commands = [Replace()]
         self.model = f"{self.llm_str}"
@@ -276,6 +201,16 @@ class MLESolver:
                 prompt=f"{err_hist}\nYou should now use ```REPLACE to create initial code to solve the challenge. Now please enter the ```REPLACE command below:\n ", temp=1.0)
             model_resp = self.clean_text(model_resp)
             cmd_str, code_lines, prev_code_ret, should_execute_code, score = self.process_command(model_resp)
+
+            # Log initial solve attempt
+            self.logger.log_step({
+                'phase': 'initial_solve',
+                'attempt': num_attempts,
+                'command': cmd_str,
+                'code_lines': code_lines,
+                'score': score
+            })
+
             print(f"@@@ INIT ATTEMPT: Command Exec // Attempt {num_attempts}: ", str(cmd_str).replace("\n", " | "))
             print(f"$$$ Score: {score}")
             if score is not None: break
@@ -288,6 +223,7 @@ class MLESolver:
         top_score = None
         self.prev_code_ret = None
         self.should_execute_code = False
+
         while True:
             if len(self.commands) == 2: cmd_app_str = "You must output either the ```EDIT or ```REPLACE command immediately. "
             else: cmd_app_str = ""
@@ -299,6 +235,17 @@ class MLESolver:
             model_resp = self.clean_text(model_resp)
             self.code_lines = copy(random.choice(self.best_codes)[0])
             cmd_str, code_lines, prev_code_ret, should_execute_code, score = self.process_command(model_resp)
+
+            # Log solve attempt
+            self.logger.log_step({
+                'phase': 'solve',
+                'attempt': num_attempts,
+                'command': cmd_str,
+                'code_lines': code_lines,
+                'score': score,
+                'model_response': model_resp
+            })
+
             self.st_history.append([model_resp, prev_code_ret, code_lines, cmd_str])
             if len(self.st_history) > self.st_hist_len: self.st_history.pop(0)
             if score is not None:
@@ -312,7 +259,20 @@ class MLESolver:
             print(f"$$$ Score: {score}")
             if num_attempts >= self.min_gen_trials and top_score is not None: break
             num_attempts += 1
+
         self.code_lines, self.prev_code_ret, self.should_execute_code, model_resp, cmd_str = best_pkg
+
+        # Log best result
+        self.logger.log_step({
+            'phase': 'solve_complete',
+            'final_score': top_score,
+            'best_code_lines': self.code_lines,
+            'total_attempts': num_attempts
+        })
+
+        # Save logs
+        self.logger.save_logs()
+
         # add top scoring code that was successful to the best codes
         if top_score > self.best_codes[-1][1]:
             # replace the lowest scoring one
@@ -325,10 +285,6 @@ class MLESolver:
         return model_resp, cmd_str
 
     def reflect_code(self):
-        """
-        Provide a reflection on produced behavior for next execution
-        @return: (str) language model-produced reflection
-        """
         code_strs = ("$"*40 + "\n\n").join([self.generate_code_lines(_code[0]) + f"\nCode Return {_code[1]}" for _code in self.best_codes])
         code_strs = f"Please reflect on the following sets of code: {code_strs} and come up with generalizable insights that will help you improve your performance on this benchmark."
         syst = self.system_prompt(commands=False) + code_strs
@@ -358,7 +314,7 @@ class MLESolver:
                         failed = True
                         code_err = str()
                         for _tries in range(GLOBAL_REPAIR_ATTEMPTS):
-                            success, args = cmd.parse_command(model_resp, copy(self.code_lines), self.dataset_code)
+                            success, args = cmd.parse_command(model_resp,copy(self.code_lines), self.dataset_code)
                             if success:
                                 cmd_return = cmd.execute_command(args)
                                 code_err = f"Return from executing code: {cmd_return[2]}"
@@ -447,7 +403,7 @@ class MLESolver:
             f"The following are notes, instructions, and general tips for you: {self.notes}"
             # PLAN DESCRIPTION
             f"You are given a machine learning research task described, where the plan is described as follows: {self.plan}\n"
-            # DATASET DESCRIPTION            
+            # DATASET DESCRIPTION
             f"{self.generate_dataset_descr_prompt()}"
             # Create Figures
             f"You should also try generating at least two figures to showcase the results, titled Figure_1.png and Figure_2.png\n"
@@ -569,7 +525,3 @@ class MLESolver:
         elif self.should_execute_code:
             return execute_code("\n".join(self.code_lines))
         return "Changes have not yet been made to the code."
-
-
-
-

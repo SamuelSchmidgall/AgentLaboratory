@@ -14,3 +14,10 @@ state_saves/*
 __pycache__/*
 Figure*.png
 testrun.py
+# Agent logs
+agent_logs/*
+!agent_logs/.gitkeep
+__pycache__/
+agent_logs/
+research_dir/
+*.pyc

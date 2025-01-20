@@ -2,6 +2,7 @@ import time, tiktoken
 from openai import OpenAI
 import openai
 import os, anthropic, json
+import google.generativeai as genai
 
 TOKENS_IN = dict()
 TOKENS_OUT = dict()
@@ -17,6 +18,7 @@ def curr_cost_est():
         "claude-3-5-sonnet": 3.00 / 1000000,
         "deepseek-chat": 1.00 / 1000000,
         "o1": 15.00 / 1000000,
+        "gemini": 2.00 / 1000000,
     }
     costmap_out = {
         "gpt-4o": 10.00/ 1000000,
@@ -26,20 +28,24 @@ def curr_cost_est():
         "claude-3-5-sonnet": 12.00 / 1000000,
         "deepseek-chat": 5.00 / 1000000,
         "o1": 60.00 / 1000000,
+        "gemini": 8.00 / 1000000,
     }
     return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
 
-def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
+def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, gemini_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
     preloaded_api = os.getenv('OPENAI_API_KEY')
     if openai_api_key is None and preloaded_api is not None:
         openai_api_key = preloaded_api
-    if openai_api_key is None and anthropic_api_key is None:
+    if openai_api_key is None and anthropic_api_key is None and gemini_api_key is None:
         raise Exception("No API key provided in query_model function")
     if openai_api_key is not None:
         openai.api_key = openai_api_key
         os.environ["OPENAI_API_KEY"] = openai_api_key
     if anthropic_api_key is not None:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+    if gemini_api_key is not None:
+        os.environ["GEMINI_API_KEY"] = gemini_api_key
+        genai.configure(api_key=gemini_api_key)
     for _ in range(tries):
         try:
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
@@ -159,10 +165,33 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     completion = client.chat.completions.create(
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
+            elif model_str == "gemini":
+                generation_config = {
+                    "temperature": temp if temp is not None else 1,
+                    "top_p": 0.95,
+                    "top_k": 64,
+                    "max_output_tokens": 8192,
+                    "response_mime_type": "text/plain",
+                }
+                model = genai.GenerativeModel(
+                    model_name="gemini-2.0-flash-thinking-exp-1219",
+                    generation_config=generation_config,
+                    system_instruction=system_prompt,
+                )
+                chat_session = model.start_chat(
+                    history=[
+                        {
+                            "role": "user",
+                            "parts": [prompt],
+                        },
+                    ]
+                )
+                response = chat_session.send_message(prompt)
+                answer = response.text
 
             if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
                 encoding = tiktoken.encoding_for_model("gpt-4o")
-            elif model_str in ["deepseek-chat"]:
+            elif model_str in ["deepseek-chat", "gemini"]:
                 encoding = tiktoken.encoding_for_model("cl100k_base")
             else:
                 encoding = tiktoken.encoding_for_model(model_str)

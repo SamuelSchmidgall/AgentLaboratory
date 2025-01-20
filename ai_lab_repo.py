@@ -7,11 +7,11 @@ from torch.backends.mkl import verbose
 import argparse
 import pickle
 
-DEFAULT_LLM_BACKBONE = "o1-mini"
+DEFAULT_LLM_BACKBONE = "gemini"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
+    def __init__(self, research_topic, openai_api_key, gemini_api_key=None, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
         """
         Initialize laboratory workflow
         @param research_topic: (str) description of research idea to explore
@@ -25,6 +25,7 @@ class LaboratoryWorkflow:
         self.max_steps = max_steps
         self.compile_pdf = compile_pdf
         self.openai_api_key = openai_api_key
+        self.gemini_api_key = gemini_api_key
         self.research_topic = research_topic
         self.model_backbone = agent_model_backbone
         self.num_papers_lit_review = num_papers_lit_review
@@ -545,6 +546,12 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        '--gemini-api-key',
+        type=str,
+        help='Provide the Gemini API key.'
+    )
+
+    parser.add_argument(
         '--load-existing',
         type=str,
         default="False",
@@ -638,13 +645,16 @@ if __name__ == "__main__":
 
     api_key = os.getenv('OPENAI_API_KEY') or args.api_key
     deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key
+    gemini_api_key = os.getenv('GEMINI_API_KEY') or args.gemini_api_key
     if args.api_key is not None and os.getenv('OPENAI_API_KEY') is None:
         os.environ["OPENAI_API_KEY"] = args.api_key
     if args.deepseek_api_key is not None and os.getenv('DEEPSEEK_API_KEY') is None:
         os.environ["DEEPSEEK_API_KEY"] = args.deepseek_api_key
+    if args.gemini_api_key is not None and os.getenv('GEMINI_API_KEY') is None:
+        os.environ["GEMINI_API_KEY"] = args.gemini_api_key
 
-    if not api_key and not deepseek_api_key:
-        raise ValueError("API key must be provided via --api-key / -deepseek-api-key or the OPENAI_API_KEY / DEEPSEEK_API_KEY environment variable.")
+    if not api_key and not deepseek_api_key and not gemini_api_key:
+        raise ValueError("API key must be provided via --api-key / -deepseek-api-key / -gemini-api-key or the OPENAI_API_KEY / DEEPSEEK_API_KEY / GEMINI_API_KEY environment variable.")
 
     ##########################################################
     # Research question that the agents are going to explore #
@@ -721,6 +731,7 @@ if __name__ == "__main__":
             agent_model_backbone=agent_models,
             human_in_loop_flag=human_in_loop,
             openai_api_key=api_key,
+            gemini_api_key=gemini_api_key,
             compile_pdf=compile_pdf,
             num_papers_lit_review=num_papers_lit_review,
             papersolver_max_steps=papersolver_max_steps,

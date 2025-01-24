@@ -33,6 +33,13 @@ frozenlist==1.5.0
 fsspec==2024.9.0
 gast==0.6.0
 google-pasta==0.2.0
+google-ai-generativelanguage==0.6.10
+google-api-core==2.24.0
+google-api-python-client==2.159.0
+google-auth==2.37.0
+google-auth-httplib2==0.2.0
+google-generativeai==0.8.3
+googleapis-common-protos==1.66.0
 grpcio==1.68.0
 h11==0.14.0
 h5py==3.12.1

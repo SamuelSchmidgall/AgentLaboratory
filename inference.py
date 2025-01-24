@@ -2,6 +2,7 @@ import time, tiktoken
 from openai import OpenAI
 import openai
 import os, anthropic, json
+import google.generativeai as genai
 
 TOKENS_IN = dict()
 TOKENS_OUT = dict()
@@ -17,6 +18,8 @@ def curr_cost_est():
         "claude-3-5-sonnet": 3.00 / 1000000,
         "deepseek-chat": 1.00 / 1000000,
         "o1": 15.00 / 1000000,
+        "gemini-1.0-pro-latest": 0.00 / 1000000, # Gemini Pro is currently free, adjust if pricing changes
+        "gemini-2.0-flash-thinking-exp-01-21": 0.00 / 1000000, # Gemini Flash is also currently free, adjust if pricing changes
     }
     costmap_out = {
         "gpt-4o": 10.00/ 1000000,
@@ -26,20 +29,33 @@ def curr_cost_est():
         "claude-3-5-sonnet": 12.00 / 1000000,
         "deepseek-chat": 5.00 / 1000000,
         "o1": 60.00 / 1000000,
+        "gemini-1.0-pro-latest": 0.00 / 1000000, # Gemini Pro is currently free, adjust if pricing changes
+        "gemini-2.0-flash-thinking-exp-01-21": 0.00 / 1000000, # Gemini Flash is also currently free, adjust if pricing changes
     }
     return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
 
-def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
-    preloaded_api = os.getenv('OPENAI_API_KEY')
-    if openai_api_key is None and preloaded_api is not None:
-        openai_api_key = preloaded_api
-    if openai_api_key is None and anthropic_api_key is None:
-        raise Exception("No API key provided in query_model function")
+def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, google_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
+    preloaded_openai_api = os.getenv('OPENAI_API_KEY')
+    preloaded_google_api = os.getenv('GOOGLE_API_KEY') # Check for Google API key
+
+    if openai_api_key is None and preloaded_openai_api is not None:
+        openai_api_key = preloaded_openai_api
+    if google_api_key is None and preloaded_google_api is not None: # Use preloaded Google API key if available
+        google_api_key = preloaded_google_api
+
+    if openai_api_key is None and anthropic_api_key is None and google_api_key is None: # Check for Google API key as well
+        raise Exception("No API key provided in query_model function (OpenAI, Anthropic, or Google required)")
+
     if openai_api_key is not None:
         openai.api_key = openai_api_key
         os.environ["OPENAI_API_KEY"] = openai_api_key
     if anthropic_api_key is not None:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+    if google_api_key is not None: # Configure Gemini with Google API key
+        genai.configure(api_key=google_api_key)
+        os.environ["GOOGLE_API_KEY"] = google_api_key
+
+
     for _ in range(tries):
         try:
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
@@ -139,7 +155,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     {"role": "user", "content": system_prompt + prompt}]
                 if version == "0.28":
                     completion = openai.ChatCompletion.create(
-                        model="o1-2024-12-17",  # engine = "deployment_name".
+                        model=f"{model_str}",  # engine = "deployment_name".
                         messages=messages)
                 else:
                     client = OpenAI()
@@ -159,13 +175,46 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     completion = client.chat.completions.create(
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
+            elif model_str == "gemini-1.0-pro-latest": # Gemini Pro
+                print(f"DEBUG: Gemini Pro - model_str: {model_str}") # DEBUG
+                print(f"DEBUG: Gemini Pro - system_prompt: {system_prompt}") # DEBUG
+                print(f"DEBUG: Gemini Pro - prompt: {prompt}") # DEBUG
+                model = genai.GenerativeModel('gemini-1.0-pro-latest')
+                print("DEBUG: Gemini Pro - GenerativeModel instantiated") # DEBUG
+                time.sleep(10) # ADD SLEEP HERE - RATE LIMITING TEST
+                try: # DEBUG - Add try-except around generate_content
+                    response = model.generate_content([system_prompt, prompt])
+                    print("DEBUG: Gemini Pro - response generated successfully") # DEBUG
+                    answer = response.text
+                except Exception as gemini_e: # DEBUG - Catch potential exceptions
+                    print(f"DEBUG: Gemini Pro - Exception during generate_content: {gemini_e}, Exception: {gemini_e}") # DEBUG
+                    raise gemini_e # DEBUG - Re-raise the exception to be caught in the outer loop
 
-            if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
+            elif model_str == "gemini-2.0-flash-thinking-exp-01-21": # Gemini Flash
+                print(f"DEBUG: Gemini Flash - model_str: {model_str}") # DEBUG
+                print(f"DEBUG: Gemini Flash - system_prompt: {system_prompt}") # DEBUG
+                print(f"DEBUG: Gemini Flash - prompt: {prompt}") # DEBUG
+                model = genai.GenerativeModel('gemini-2.0-flash-thinking-exp-01-21')
+                print("DEBUG: Gemini Flash - GenerativeModel instantiated") # DEBUG
+                time.sleep(10)  # ADD SLEEP HERE - RATE LIMITING TEST
+                try: # DEBUG - Add try-except around generate_content
+                    response = model.generate_content([system_prompt, prompt])
+                    print("DEBUG: Gemini Flash - response generated successfully") # DEBUG
+                    answer = response.text
+                except Exception as gemini_e: # DEBUG - Catch potential exceptions
+                    print(f"DEBUG: Gemini Flash - Exception during generate_content: {gemini_e}, Exception: {gemini_e}") # DEBUG
+                    raise gemini_e # DEBUG - Re-raise the exception to be caught in the outer loop
+
+
+            # TODO use model.count_tokens instead for
+            if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1", "gemini-1.0-pro-latest", "gemini-2.0-flash-thinking-exp-01-21"]:
                 encoding = tiktoken.encoding_for_model("gpt-4o")
             elif model_str in ["deepseek-chat"]:
                 encoding = tiktoken.encoding_for_model("cl100k_base")
             else:
                 encoding = tiktoken.encoding_for_model(model_str)
+
+
             if model_str not in TOKENS_IN:
                 TOKENS_IN[model_str] = 0
                 TOKENS_OUT[model_str] = 0
@@ -179,6 +228,9 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             time.sleep(timeout)
             continue
     raise Exception("Max retries: timeout")
+
+
+#print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))
 
 
 #print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))

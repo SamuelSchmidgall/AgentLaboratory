@@ -6,6 +6,7 @@ from torch.backends.mkl import verbose
 
 import argparse
 import pickle
+import google.generativeai as genai  # Import Gemini library
 
 DEFAULT_LLM_BACKBONE = "o1-mini"
 
@@ -24,7 +25,7 @@ class LaboratoryWorkflow:
         self.notes = notes
         self.max_steps = max_steps
         self.compile_pdf = compile_pdf
-        self.openai_api_key = openai_api_key
+        self.openai_api_key = openai_api_key # Still using openai_api_key name for legacy reasons, but should be considered general API key - used for both OpenAI and Gemini if selected
         self.research_topic = research_topic
         self.model_backbone = agent_model_backbone
         self.num_papers_lit_review = num_papers_lit_review
@@ -79,7 +80,7 @@ class LaboratoryWorkflow:
 
         self.save = True
         self.verbose = True
-        self.reviewers = ReviewersAgent(model=self.model_backbone, notes=self.notes, openai_api_key=self.openai_api_key)
+        self.reviewers = ReviewersAgent(model=self.model_backbone, notes=self.notes, openai_api_key=self.openai_api_key) # still using openai_api_key for agents, will update agent class as well
         self.phd = PhDStudentAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
         self.postdoc = PostdocAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
         self.professor = ProfessorAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
@@ -541,7 +542,8 @@ def parse_arguments():
     parser.add_argument(
         '--deepseek-api-key',
         type=str,
-        help='Provide the DeepSeek API key.'
+        default="False", # setting default to False as it's not primarily used in this version
+        help='Provide the DeepSeek API key. (Not used in this version, for future compatibility)'
     )
 
     parser.add_argument(
@@ -566,7 +568,7 @@ def parse_arguments():
     parser.add_argument(
         '--api-key',
         type=str,
-        help='Provide the OpenAI API key.'
+        help='Provide the API key (OpenAI API key or Google API key if using Gemini models). Will prioritize GOOGLE_API_KEY env variable if both are set and Gemini is selected.'
     )
 
     parser.add_argument(
@@ -580,7 +582,7 @@ def parse_arguments():
         '--llm-backend',
         type=str,
         default="o1-mini",
-        help='Backend LLM to use for agents in Agent Laboratory.'
+        help='Backend LLM to use for agents in Agent Laboratory. Options: o1-mini, gemini-1.0-pro-latest'
     )
 
     parser.add_argument(
@@ -638,13 +640,22 @@ if __name__ == "__main__":
 
     api_key = os.getenv('OPENAI_API_KEY') or args.api_key
     deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key
+    google_api_key = os.getenv('GOOGLE_API_KEY') or args.api_key
+
     if args.api_key is not None and os.getenv('OPENAI_API_KEY') is None:
         os.environ["OPENAI_API_KEY"] = args.api_key
     if args.deepseek_api_key is not None and os.getenv('DEEPSEEK_API_KEY') is None:
         os.environ["DEEPSEEK_API_KEY"] = args.deepseek_api_key
+    if args.api_key is not None and os.getenv('GOOGLE_API_KEY') is None: # setting google api key as well if openai key is provided as fallback for gemini
+        os.environ["GOOGLE_API_KEY"] = args.api_key
 
-    if not api_key and not deepseek_api_key:
-        raise ValueError("API key must be provided via --api-key / -deepseek-api-key or the OPENAI_API_KEY / DEEPSEEK_API_KEY environment variable.")
+    if llm_backend == "gemini-2.0-flash-thinking-exp-01-21": # check if gemini is selected as backend
+        if not google_api_key: # if gemini is selected, prioritize GOOGLE_API_KEY env variable or --api-key
+            raise ValueError("API key must be provided via --api-key or the GOOGLE_API_KEY environment variable when using Gemini models.")
+        genai.configure(api_key=google_api_key) # configure gemini api with google api key
+    elif not api_key and not deepseek_api_key: # for o1-mini (and potentially other openai models in the future), require openai key
+        raise ValueError("API key must be provided via --api-key / -deepseek-api-key or the OPENAI_API_KEY / DEEPSEEK_API_KEY environment variable when using OpenAI models.")
+
 
     ##########################################################
     # Research question that the agents are going to explore #
@@ -659,13 +670,10 @@ if __name__ == "__main__":
          "note": f"You should come up with a plan for TWO experiments."},
 
         {"phases": ["plan formulation", "data preparation", "running experiments"],
-         "note": "Please use gpt-4o-mini for your experiments."},
+         "note": f"Please use {llm_backend} for your experiments. You have the option to use either 'o1-mini' or 'gemini-1.0-pro-latest' as the backend model."}, # updated note to reflect gemini option
 
-        {"phases": ["running experiments"],
-         "note": f'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
-
-        {"phases": ["running experiments"],
-         "note": f"You have access to only gpt-4o-mini using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
+        # Removed OpenAI specific notes, as now we are using Gemini by default
+        # If you want to use OpenAI models again, you would need to add similar notes but for OpenAI API
 
         {"phases": ["running experiments"],
          "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
@@ -719,8 +727,7 @@ if __name__ == "__main__":
             research_topic=research_topic,
             notes=task_notes_LLM,
             agent_model_backbone=agent_models,
-            human_in_loop_flag=human_in_loop,
-            openai_api_key=api_key,
+            openai_api_key=api_key, # still using openai_api_key, but it's ok as agents will use it as general key now - for both OpenAI and Gemini if selected
             compile_pdf=compile_pdf,
             num_papers_lit_review=num_papers_lit_review,
             papersolver_max_steps=papersolver_max_steps,
@@ -728,9 +735,3 @@ if __name__ == "__main__":
         )
 
     lab.perform_research()
-
-
-
-
-
-

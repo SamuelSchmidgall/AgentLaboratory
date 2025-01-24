@@ -145,6 +145,7 @@ def get_score(outlined_plan, latex, reward_model_llm, reviewer_type=None, attemp
                 prompt=(
                     f"Outlined in the following text is the research plan that the machine learning engineer was tasked with building: {outlined_plan}\n\n"
                     f"The following text is the research latex that the model produced: \n{latex}\n\n"), temp=0.0)
+            print(f"DEBUG: query_model parameters - model_str: {reward_model_llm}, system_prompt: {sys[:50]}..., prompt: {('''f"Outlined in the following text is the research plan that the machine learning engineer was tasked with building: {outlined_plan}\n\nThe following text is the research latex that the model produced: \n{latex}\n\n"''')[:50]}...")
             review_json = extract_json_between_markers(scoring)
 
             overall = int(review_json["Overall"]) / 10
@@ -188,14 +189,21 @@ class ReviewersAgent:
         self.openai_api_key = openai_api_key
 
     def inference(self, plan, report):
+        print("** Reviewers agent")
         reviewer_1 = "You are a harsh but fair reviewer and expect good experiments that lead to insights for the research topic."
-        review_1 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_1, openai_api_key=self.openai_api_key)
+        review_1_score, review_1_output, review_1_valid = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_1, openai_api_key=self.openai_api_key)
+        if not review_1_valid: review_1 = f"Review failed due to error: {review_1_output}"
+        else: review_1 = f"Review Score: {review_1_score}, Full Review: {review_1_output}"
 
         reviewer_2 = "You are a harsh and critical but fair reviewer who is looking for an idea that would be impactful in the field."
-        review_2 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_2, openai_api_key=self.openai_api_key)
+        review_2_score, review_2_output, review_2_valid = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_2, openai_api_key=self.openai_api_key)
+        if not review_2_valid: review_2 = f"Review failed due to error: {review_2_output}"
+        else: review_2 = f"Review Score: {review_2_score}, Full Review: {review_2_output}"
 
         reviewer_3 = "You are a harsh but fair open-minded reviewer that is looking for novel ideas that have not been proposed before."
-        review_3 = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_3, openai_api_key=self.openai_api_key)
+        review_3_score, review_3_output, review_3_valid = get_score(outlined_plan=plan, latex=report, reward_model_llm=self.model, reviewer_type=reviewer_3, openai_api_key=self.openai_api_key)
+        if not review_3_valid: review_3 = f"Review failed due to error: {review_3_output}"
+        else: review_3 = f"Review Score: {review_3_score}, Full Review: {review_3_output}"
 
         return f"Reviewer #1:\n{review_1}, \nReviewer #2:\n{review_2}, \nReviewer #3:\n{review_3}"
 
@@ -251,7 +259,26 @@ class BaseAgent:
             f"Current Step #{step}, Phase: {phase}\n{complete_str}\n"
             f"[Objective] Your goal is to perform research on the following topic: {research_topic}\n"
             f"Feedback: {feedback}\nNotes: {notes_str}\nYour previous command was: {self.prev_comm}. Make sure your new output is very different.\nPlease produce a single command below:\n")
-        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, temp=temp, openai_api_key=self.openai_api_key)
+
+        print(f"DEBUG: BaseAgent.inference - model_str: {self.model}")  # Debug print
+
+        if self.model in ["gemini-1.0-pro-latest", "gemini-2.0-flash-thinking-exp-01-21"]: # Gemini models
+            model_resp = query_model(
+                model_str=self.model, 
+                system_prompt=sys_prompt, 
+                prompt=prompt, 
+                temp=temp, 
+                google_api_key=self.openai_api_key  # Pass google_api_key for Gemini
+            )
+        else: # OpenAI models (o1-mini, etc.)
+            model_resp = query_model(
+                model_str=self.model, 
+                system_prompt=sys_prompt, 
+                prompt=prompt, 
+                temp=temp, 
+                openai_api_key=self.openai_api_key # Pass openai_api_key for OpenAI
+            )
+
         print("^"*50, phase, "^"*50)
         model_resp = self.clean_text(model_resp)
         self.prev_comm = model_resp
@@ -301,7 +328,10 @@ class ProfessorAgent(BaseAgent):
         prompt = (
             f"""History: {history_str}\n{'~' * 10}\n"""
             f"Please produce the readme below in markdown:\n")
-        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, openai_api_key=self.openai_api_key)
+        if self.model in ["gemini-1.0-pro-latest", "gemini-2.0-flash-thinking-exp-01-21"]: # Gemini models
+            model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, google_api_key=self.openai_api_key)
+        else: # OpenAI models (o1-mini, etc.)
+            model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, openai_api_key=self.openai_api_key)
         return model_resp.replace("```markdown", "")
 
     def context(self, phase):
@@ -557,6 +587,7 @@ class SWEngineerAgent(BaseAgent):
 class PhDStudentAgent(BaseAgent):
     def __init__(self, model="gpt4omini", notes=None, max_steps=100, openai_api_key=None):
         super().__init__(model, notes, max_steps, openai_api_key)
+        print(f"** PhDStudent agent model: {model}")
         self.phases = [
             "literature review",
             "plan formulation",
@@ -612,14 +643,17 @@ class PhDStudentAgent(BaseAgent):
         else:
             return ""
 
-    def requirements_txt(self):
-        sys_prompt = f"""You are {self.role_description()} \nTask instructions: Your goal is to integrate all of the knowledge, code, reports, and notes provided to you and generate a requirements.txt for a github repository for all of the code."""
-        history_str = "\n".join([_[1] for _ in self.history])
-        prompt = (
-            f"""History: {history_str}\n{'~' * 10}\n"""
-            f"Please produce the requirements.txt below in markdown:\n")
-        model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, openai_api_key=self.openai_api_key)
-        return model_resp
+        def requirements_txt(self):
+            sys_prompt = f"""You are {self.role_description()} \nTask instructions: Your goal is to integrate all of the knowledge, code, reports, and notes provided to you and generate a requirements.txt for a github repository for all of the code."""
+            history_str = "\n".join([_[1] for _ in self.history])
+            prompt = (
+                f"""History: {history_str}\n{'~' * 10}\n"""
+                f"Please produce the requirements.txt below in markdown:\n")
+            if self.model in ["gemini-1.0-pro-latest", "gemini-2.0-flash-thinking-exp-01-21"]: # Gemini models
+                model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, google_api_key=self.openai_api_key)
+            else: # OpenAI models (o1-mini, etc.)
+                model_resp = query_model(model_str=self.model, system_prompt=sys_prompt, prompt=prompt, openai_api_key=self.openai_api_key)
+            return model_resp
 
     def example_command(self, phase):
         if phase not in self.phases:
@@ -654,8 +688,7 @@ class PhDStudentAgent(BaseAgent):
         elif phase == "results interpretation":
             return (
                 "You can produce dialogue using the following command: ```DIALOGUE\ndialogue here\n```\n where 'dialogue here' is the actual dialogue you will send and DIALOGUE is just the word DIALOGUE.\n"
-                "When performing a command, make sure to include the three ticks (```) at the top and bottom ```COMMAND\ntext\n``` where COMMAND is the specific command you want to run (e.g. DIALOGUE).\n"
-            )
+                "When performing a command, make sure to include the three ticks (```) at the top and bottom ```COMMAND\ntext\n``` where COMMAND is the specific command you want to run (e.g. DIALOGUE).\n")
         #elif phase == "report writing":
         #    return (
         #        "You can produce dialogue using the following command: ```DIALOGUE\ndialogue here\n```\n where 'dialogue here' is the actual dialogue you will send and DIALOGUE is just the word DIALOGUE.\n"
@@ -723,6 +756,3 @@ class PhDStudentAgent(BaseAgent):
         return "Provided here is a literature review on this topic:\n" + "\n".join(
             f"arXiv ID: {_l['arxiv_id']}, Summary: {_l['summary']}"
             for _l in self.lit_review)
-
-
-

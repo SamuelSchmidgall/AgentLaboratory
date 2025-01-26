@@ -12,6 +12,9 @@ from abc import abstractmethod
 
 from contextlib import contextmanager
 import sys, os
+from llm_client import LLMQueryManager
+
+llm_query_manager = LLMQueryManager()
 
 @contextmanager
 def suppress_stdout():
@@ -279,13 +282,12 @@ class PaperSolver:
         self.prev_paper_ret = None
         while True:
             self.paper_lines = copy(random.choice(self.best_report)[0])
-            model_resp = query_model(
-                model_str=self.model,
+            model_resp = llm_query_manager.query_model(
+                model_name=self.model,
                 system_prompt=self.system_prompt(),
                 prompt=f"\nNow please enter a command: ",
-                temp=1.0,
-                openai_api_key=self.openai_api_key)
-            #print(model_resp)
+                temperature=1.0,
+                api_key=self.openai_api_key)
             model_resp = self.clean_text(model_resp)
             cmd_str, paper_lines, prev_paper_ret, score = self.process_command(model_resp)
             if score is not None:
@@ -351,7 +353,11 @@ class PaperSolver:
                         break
                     if not first_attempt:
                         att_str = "This is not your first attempt please try to come up with a simpler search query."
-                    search_query = query_model(model_str=f"{self.llm_str}", prompt=f"Given the following research topic {self.topic} and research plan: \n\n{self.plan}\n\nPlease come up with a search query to find relevant papers on arXiv. Respond only with the search query and nothing else. This should be a a string that will be used to find papers with semantically similar content. {att_str}", system_prompt=f"You are a research paper finder. You must find papers for the section {_section}. Query must be text nothing else.", openai_api_key=self.openai_api_key)
+                    search_query = llm_query_manager.query_model(
+                        model_name=f"{self.llm_str}",
+                        prompt=f"Given the following research topic {self.topic} and research plan: \n\n{self.plan}\n\nPlease come up with a search query to find relevant papers on arXiv. Respond only with the search query and nothing else. This should be a a string that will be used to find papers with semantically similar content. {att_str}",
+                        system_prompt=f"You are a research paper finder. You must find papers for the section {_section}. Query must be text nothing else.",
+                        api_key=self.openai_api_key)
                     search_query.replace('"', '')
                     papers = arx.find_papers_by_str(query=search_query, N=10)
                     first_attempt = False
@@ -369,12 +375,12 @@ class PaperSolver:
                     if _section in self.section_related_work:
                         rp = f"Here are related papers you can cite: {self.section_related_work[_section]}. You can cite them just by putting the arxiv ID in parentheses, e.g. (arXiv 2308.11483v1)\n"
                     prompt = f"{err}\n{rp}\nNow please enter the ```REPLACE command to create the designated section, make sure to only write the text for that section and nothing else. Do not include packages or section titles, just the section content:\n "
-                model_resp = query_model(
-                    model_str=self.model,
+                model_resp = llm_query_manager.query_model(
+                    model_name=self.model,
                     system_prompt=self.system_prompt(section=_section),
                     prompt=f"{prompt}",
-                    temp=0.8,
-                    openai_api_key=self.openai_api_key)
+                    temperature=0.8,
+                    api_key=self.openai_api_key)
                 model_resp = self.clean_text(model_resp)
                 if _section == "scaffold":
                     # minimal scaffold (some other sections can be combined)
@@ -437,7 +443,7 @@ class PaperSolver:
                         else:
                             paper_lines = copy(args[1]) #
                             if scoring:
-                                score, cmd_str, is_valid = get_score(self.plan, "\n".join(paper_lines), reward_model_llm=self.llm_str)
+                                score, cmd_str, is_valid = get_score(self.plan, "\n".join(paper_lines), reward_model_llm=self.llm_str, openai_api_key=self.openai_api_key)
                             else:
                                 score, cmd_str, is_valid = 0.0, "Paper scored successfully", True
                             if is_valid: failed = False
@@ -459,7 +465,7 @@ class PaperSolver:
                     if success:
                         paper_lines = copy(args[0]) #
                         if scoring:
-                            score, cmd_str, is_valid = get_score(self.plan, "\n".join(paper_lines), reward_model_llm=self.llm_str)
+                            score, cmd_str, is_valid = get_score(self.plan, "\n".join(paper_lines), reward_model_llm=self.llm_str, openai_api_key=self.openai_api_key)
                         else:
                             score, cmd_str, is_valid = 0.0, "Paper scored successfully", True
                         if is_valid: failed = False

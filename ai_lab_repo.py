@@ -355,7 +355,7 @@ class LaboratoryWorkflow:
                 if self.verbose: print("#"*40, f"\nThe following is dialogue produced by the SW Engineer: {dialogue}", "\n", "#"*40)
             if "```SUBMIT_CODE" in resp:
                 final_code = extract_prompt(resp, "SUBMIT_CODE")
-                code_resp = execute_code(final_code, timeout=60)
+                code_resp = execute_code(final_code)
                 if self.verbose: print("!"*100, "\n", f"CODE RESPONSE: {code_resp}")
                 swe_feedback += f"\nCode Response: {code_resp}\n"
                 if "[CODE EXECUTION ERROR]" in code_resp:
@@ -389,7 +389,7 @@ class LaboratoryWorkflow:
             if "```python" in resp:
                 code = extract_prompt(resp, "python")
                 code = self.ml_engineer.dataset_code + "\n" + code
-                code_resp = execute_code(code, timeout=120)
+                code_resp = execute_code(code)
                 ml_command = f"Code produced by the ML agent:\n{code}"
                 ml_feedback += f"\nCode Response: {code_resp}\n"
                 if self.verbose: print("!"*100, "\n", f"CODE RESPONSE: {code_resp}")
@@ -446,10 +446,13 @@ class LaboratoryWorkflow:
         @return: (bool) whether to repeat the phase
         """
         arx_eng = ArxivSearch()
-        max_tries = self.max_steps * 5 # lit review often requires extra steps
+        max_tries = self.max_steps * 5  # lit review often requires extra steps
+        
         # get initial response from PhD agent
         resp = self.phd.inference(self.research_topic, "literature review", step=0, temp=0.8)
-        if self.verbose: print(resp, "\n~~~~~~~~~~~")
+        if self.verbose:
+            print(resp, "\n~~~~~~~~~~~")
+
         # iterate until max num tries to complete task is exhausted
         for _i in range(max_tries):
             feedback = str()
@@ -463,14 +466,30 @@ class LaboratoryWorkflow:
             # grab full text from arxiv ID
             elif "```FULL_TEXT" in resp:
                 query = extract_prompt(resp, "FULL_TEXT")
-                # expiration timer so that paper does not remain in context too long
-                arxiv_paper = f"```EXPIRATION {self.arxiv_paper_exp_time}\n" + arx_eng.retrieve_full_paper_text(query) + "```"
+                try:
+                    # expiration timer so that paper does not remain in context too long
+                    full_text_content = arx_eng.retrieve_full_paper_text(query)
+                except Exception as e:
+                    # Catch any unexpected errors from arxiv.Client()
+                    err_msg = f"[ERROR] Could not retrieve paper. Possibly invalid arXiv ID. Error: {e}"
+                    full_text_content = err_msg
+
+                # In case retrieve_full_paper_text returns an error string
+                # or if we want to unify it, e.g. "[ERROR] ...something"
+                if full_text_content.startswith("[ERROR]"):
+                    # We won't crash; just pass that as feedback
+                    arxiv_paper = f"```EXPIRATION {self.arxiv_paper_exp_time}\n{full_text_content}```"
+                else:
+                    # normal successful retrieval
+                    arxiv_paper = f"```EXPIRATION {self.arxiv_paper_exp_time}\n{full_text_content}```"
+
                 feedback = arxiv_paper
 
             # if add paper, extract and add to lit review, provide feedback
             elif "```ADD_PAPER" in resp:
                 query = extract_prompt(resp, "ADD_PAPER")
                 feedback, text = self.phd.add_review(query, arx_eng)
+                # If we want to store reference text for later usage
                 if len(self.reference_papers) < self.num_ref_papers:
                     self.reference_papers.append(text)
 
@@ -478,6 +497,7 @@ class LaboratoryWorkflow:
             if len(self.phd.lit_review) >= self.num_papers_lit_review:
                 # generate formal review
                 lit_review_sum = self.phd.format_review()
+
                 # if human in loop -> check if human is happy with the produced review
                 if self.human_in_loop_flag["literature review"]:
                     retry = self.human_in_loop("literature review", lit_review_sum)
@@ -485,17 +505,31 @@ class LaboratoryWorkflow:
                     if retry:
                         self.phd.lit_review = []
                         return retry
+
                 # otherwise, return lit review and move on to next stage
-                if self.verbose: print(self.phd.lit_review_sum)
+                if self.verbose:
+                    print(self.phd.lit_review_sum)
                 # set agent
                 self.set_agent_attr("lit_review_sum", lit_review_sum)
                 # reset agent state
                 self.reset_agents()
                 self.statistics_per_phase["literature review"]["steps"] = _i
                 return False
-            resp = self.phd.inference(self.research_topic, "literature review", feedback=feedback, step=_i + 1, temp=0.8)
-            if self.verbose: print(resp, "\n~~~~~~~~~~~")
+
+            # Move on to the next iteration with new feedback
+            resp = self.phd.inference(
+                self.research_topic, 
+                "literature review", 
+                feedback=feedback, 
+                step=_i + 1, 
+                temp=0.8
+            )
+            if self.verbose:
+                print(resp, "\n~~~~~~~~~~~")
+
+        # If we exceed max_tries:
         raise Exception("Max tries during phase: Literature Review")
+
 
     def human_in_loop(self, phase, phase_prod):
         """
@@ -611,6 +645,7 @@ def parse_arguments():
         help='Total number of paper-solver steps'
     )
 
+    parser.add_argument('--file-path', type=str, default=None)
 
     return parser.parse_args()
 
@@ -622,6 +657,8 @@ if __name__ == "__main__":
     human_mode = args.copilot_mode.lower() == "true"
     compile_pdf = args.compile_latex.lower() == "true"
     load_existing = args.load_existing.lower() == "true"
+    file_path = args.file_path
+
     try:
         num_papers_lit_review = int(args.num_papers_lit_review.lower())
     except Exception:
@@ -653,6 +690,13 @@ if __name__ == "__main__":
         research_topic = input("Please name an experiment idea for AgentLaboratory to perform: ")
     else:
         research_topic = args.research_topic
+
+    if file_path and "{FILE}" in research_topic:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            file_content = f.read()
+        # Replace the placeholder with the entire file text
+        research_topic = research_topic.replace("{FILE}", file_content)
+
 
     task_notes_LLM = [
         {"phases": ["plan formulation"],

@@ -74,7 +74,7 @@ def save_to_file(location, filename, data):
         print(f"Error saving file {filename}: {e}")
 
 
-def clip_tokens(messages, model="gpt-4", max_tokens=100000):
+def clip_tokens(messages, model="o1-mini", max_tokens=128000):
     enc = tiktoken.encoding_for_model(model)
     total_tokens = sum([len(enc.encode(message["content"])) for message in messages])
 

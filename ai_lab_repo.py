@@ -11,7 +11,7 @@ DEFAULT_LLM_BACKBONE = "o1-mini"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
+    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5, openai_base_url="https://api.openai.com/v1"):
         """
         Initialize laboratory workflow
         @param research_topic: (str) description of research idea to explore
@@ -28,6 +28,7 @@ class LaboratoryWorkflow:
         self.research_topic = research_topic
         self.model_backbone = agent_model_backbone
         self.num_papers_lit_review = num_papers_lit_review
+        self.openai_base_url = openai_base_url
 
         self.print_cost = True
         self.review_override = True # should review be overridden?
@@ -570,6 +571,13 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        '--base-url',
+        type=str,
+        default="https://api.openai.com/v1",
+        help='Base URL for OpenAI API.'
+    )
+
+    parser.add_argument(
         '--compile-latex',
         type=str,
         default="True",
@@ -646,6 +654,11 @@ if __name__ == "__main__":
     if not api_key and not deepseek_api_key:
         raise ValueError("API key must be provided via --api-key / -deepseek-api-key or the OPENAI_API_KEY / DEEPSEEK_API_KEY environment variable.")
 
+    base_url = os.getenv('OPENAI_BASE_URL') or args.base_url
+    if args.base_url is not None and os.getenv('OPENAI_BASE_URL') is None:
+        os.environ["OPENAI_BASE_URL"] = args.base_url
+
+    
     ##########################################################
     # Research question that the agents are going to explore #
     ##########################################################
@@ -662,7 +675,7 @@ if __name__ == "__main__":
          "note": "Please use gpt-4o-mini for your experiments."},
 
         {"phases": ["running experiments"],
-         "note": f'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
+         "note": f'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nopenai.base_url = {base_url}\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
 
         {"phases": ["running experiments"],
          "note": f"You have access to only gpt-4o-mini using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
@@ -725,6 +738,7 @@ if __name__ == "__main__":
             num_papers_lit_review=num_papers_lit_review,
             papersolver_max_steps=papersolver_max_steps,
             mlesolver_max_steps=mlesolver_max_steps,
+            openai_base_url=base_url
         )
 
     lab.perform_research()

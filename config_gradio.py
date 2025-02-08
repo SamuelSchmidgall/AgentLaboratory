@@ -20,6 +20,20 @@ def get_existing_saves() -> list:
         return ["No saved states found"]
 
 
+def refresh_saves_dropdown():
+    """
+    IMPORTANT PART:
+    Return a *new* gr.Dropdown component populated with fresh choices.
+    This replaces the existing dropdown instead of attempting to update it.
+    """
+    new_saves = get_existing_saves()
+    return gr.Dropdown(
+        choices=new_saves,
+        label="Select Saved Research State",
+        interactive=True
+    )
+
+
 def run_research_process(
     research_topic: str,
     api_key: str,
@@ -155,7 +169,7 @@ def create_gradio_config() -> gr.Blocks:
                         value="o1-mini"
                     )
                     language = gr.Dropdown(
-                        languages,
+                        choices=languages,
                         label="Language",
                         value="English"
                     )
@@ -212,13 +226,14 @@ def create_gradio_config() -> gr.Blocks:
                     """
                 )
 
-        # Refresh saved states
+        # Instead of returning just a list, return a new Dropdown from refresh_saves_dropdown()
         refresh_saves_btn.click(
-            fn=get_existing_saves,
+            fn=refresh_saves_dropdown,
+            inputs=None,
             outputs=existing_saves
         )
 
-        # Connect submit button to research process with the new custom_llm_backend input.
+        # Connect submit button to a research process with the new custom_llm_backend input.
         submit_btn.click(
             fn=run_research_process,
             inputs=[

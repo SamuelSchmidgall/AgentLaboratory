@@ -141,7 +141,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     temperature=temp,
                     base_url=GOOGLE_GENERATIVE_API_BASE_URL,
                 )
-            elif api_key == "ollama":
+            elif openai_api_key == "ollama":
                 answer = OpenaiProvider.get_response(
                     api_key="ollama",
                     model_name=model_str,
@@ -154,7 +154,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                 raise Exception(f"Model {model_str} not found")
 
             # Cost estimation when not using Ollama
-            if api_key != "ollama":
+            if openai_api_key != "ollama":
                 try:
                     if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
                         encoding = tiktoken.encoding_for_model("gpt-4o")

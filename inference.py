@@ -2,9 +2,6 @@ import os
 import tiktoken
 import time
 
-import openai
-from openai import api_key
-
 from config import GOOGLE_GENERATIVE_API_BASE_URL, DEEPSEEK_API_BASE_URL, OLLAMA_API_BASE_URL
 from provider import AnthropicProvider, OpenaiProvider
 
@@ -43,25 +40,34 @@ def curr_cost_est():
         [costmap_out[_] * TOKENS_OUT[_] for _ in TOKENS_OUT])
 
 
-def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0,
+def query_model(model_str, prompt, system_prompt,
+                openai_api_key=None, anthropic_api_key=None,
+                tries=5, timeout=5.0,
                 temp=None, print_cost=True, version="1.5"):
-    preloaded_api = os.getenv('OPENAI_API_KEY')
-    if openai_api_key is None and preloaded_api is not None:
-        openai_api_key = preloaded_api
-    if openai_api_key is None and anthropic_api_key is None:
-        raise Exception("No API key provided in query_model function")
+    # Override the API keys if provided in the function call
     if openai_api_key is not None:
-        openai.api_key = openai_api_key
         os.environ["OPENAI_API_KEY"] = openai_api_key
     if anthropic_api_key is not None:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+
+    preloaded_openai_api = os.getenv('OPENAI_API_KEY')
+    preload_anthropic_api = os.getenv('ANTHROPIC_API_KEY')
+    preload_google_api = os.getenv('GOOGLE_API_KEY')
+    preload_deepseek_api = os.getenv('DEEPSEEK_API_KEY')
+
+    # If no API key is provided, raise an exception
+    if (preloaded_openai_api is None and
+        preload_anthropic_api is None and
+        preload_google_api is None and
+        preload_deepseek_api is None):
+        raise Exception("No API key provided in query_model function")
+
     for _ in range(tries):
         try:
-            answer = ""
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
                 model_str = "gpt-4o-mini"
                 answer = OpenaiProvider.get_response(
-                    api_key=openai_api_key,
+                    api_key=os.getenv('OPENAI_API_KEY'),
                     model_name="gpt-4o-mini" if version == "0.28" else "gpt-4o-mini-2024-07-18",
                     user_prompt=prompt,
                     system_prompt=system_prompt,
@@ -70,7 +76,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             elif model_str == "gpt4o" or model_str == "gpt-4o":
                 model_str = "gpt-4o"
                 answer = OpenaiProvider.get_response(
-                    api_key=openai_api_key,
+                    api_key=os.getenv('OPENAI_API_KEY'),
                     model_name="gpt-4o" if version == "0.28" else "gpt-4o-2024-08-06",
                     user_prompt=prompt,
                     system_prompt=system_prompt,
@@ -79,7 +85,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             elif model_str == "o1-mini":
                 model_str = "o1-mini"
                 answer = OpenaiProvider.get_response(
-                    api_key=openai_api_key,
+                    api_key=os.getenv('OPENAI_API_KEY'),
                     model_name="o1-mini" if version == "0.28" else "o1-mini-2024-09-12",
                     user_prompt=prompt,
                     system_prompt=system_prompt,
@@ -88,7 +94,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             elif model_str == "o1":
                 model_str = "o1"
                 answer = OpenaiProvider.get_response(
-                    api_key=openai_api_key,
+                    api_key=os.getenv('OPENAI_API_KEY'),
                     model_name="o1" if version == "0.28" else "o1-2024-12-17",
                     user_prompt=prompt,
                     system_prompt=system_prompt,
@@ -97,7 +103,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             elif model_str == "o1-preview":
                 model_str = "o1-preview"
                 answer = OpenaiProvider.get_response(
-                    api_key=openai_api_key,
+                    api_key=os.getenv('OPENAI_API_KEY'),
                     model_name="o1-preview" if version == "0.28" else "o1-preview-2024-12-17",
                     user_prompt=prompt,
                     system_prompt=system_prompt,
@@ -141,7 +147,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     temperature=temp,
                     base_url=GOOGLE_GENERATIVE_API_BASE_URL,
                 )
-            elif openai_api_key == "ollama":
+            elif preloaded_openai_api == "ollama":
                 answer = OpenaiProvider.get_response(
                     api_key="ollama",
                     model_name=model_str,
@@ -154,23 +160,23 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                 raise Exception(f"Model {model_str} not found")
 
             # Cost estimation when not using Ollama
-            if openai_api_key != "ollama":
+            if preloaded_openai_api != "ollama":
                 try:
                     if model_str in [
-                        "o1-preview", "o1-mini", "o1", 
+                        "o1-preview", "o1-mini", "o1",
                         "claude-3.5-sonnet", "claude-3-5-haiku",
                         "gemini-2.0-flash", "gemini-2.0-flash-lite"
                     ]:
-                        encoding = tiktoken.encoding_for_model("gpt-4o")
+                        model_encoding = tiktoken.encoding_for_model("gpt-4o")
                     elif model_str in ["deepseek-chat"]:
-                        encoding = tiktoken.get_encoding("cl100k_base")
+                        model_encoding = tiktoken.get_encoding("cl100k_base")
                     else:
-                        encoding = tiktoken.encoding_for_model(model_str)
+                        model_encoding = tiktoken.encoding_for_model(model_str)
                     if model_str not in TOKENS_IN:
                         TOKENS_IN[model_str] = 0
                         TOKENS_OUT[model_str] = 0
-                    TOKENS_IN[model_str] += len(encoding.encode(system_prompt + prompt))
-                    TOKENS_OUT[model_str] += len(encoding.encode(answer))
+                    TOKENS_IN[model_str] += len(model_encoding.encode(system_prompt + prompt))
+                    TOKENS_OUT[model_str] += len(model_encoding.encode(answer))
                     if print_cost:
                         print(
                             f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")

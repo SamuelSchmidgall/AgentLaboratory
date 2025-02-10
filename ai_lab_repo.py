@@ -248,7 +248,11 @@ class LaboratoryWorkflow:
                 raise Exception("Model did not respond")
             response = response.lower().strip()[0]
             if response == "n":
-                if verbose: print("*"*40, "\n", "REVIEW COMPLETE", "\n", "*"*40)
+                if verbose:
+                    print("*"*40, "\n", "REVIEW COMPLETE", "\n", "*"*40)
+                    # system pause to allow for reading
+                    input(f"Press enter to continue to completion of the project.")
+
                 return False
             elif response == "y":
                 self.set_agent_attr("reviewer_response", f"Provided are reviews from a set of three reviewers: {reviews}.")

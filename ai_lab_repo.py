@@ -11,7 +11,7 @@ DEFAULT_LLM_BACKBONE = "o1-mini"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
+    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=None, notes=None, human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
         """
         Initialize laboratory workflow
         @param research_topic: (str) description of research idea to explore
@@ -21,12 +21,15 @@ class LaboratoryWorkflow:
         @param notes: (list) notes for agent to follow during tasks
         """
 
+        if notes is None:
+            notes = []
+
         self.notes = notes
         self.max_steps = max_steps
         self.compile_pdf = compile_pdf
         self.openai_api_key = openai_api_key
         self.research_topic = research_topic
-        self.model_backbone = agent_model_backbone
+        self.model_backbone = os.getenv('LLM_BACKEND') if os.getenv('LLM_BACKEND') is not None else DEFAULT_LLM_BACKBONE
         self.num_papers_lit_review = num_papers_lit_review
 
         self.print_cost = True
@@ -34,6 +37,18 @@ class LaboratoryWorkflow:
         self.review_ovrd_steps = 0 # review steps so far
         self.arxiv_paper_exp_time = 3
         self.reference_papers = list()
+
+
+        if agent_model_backbone is None:
+            agent_model_backbone = {
+                "literature review": self.model_backbone,
+                "plan formulation": self.model_backbone,
+                "data preparation": self.model_backbone,
+                "running experiments": self.model_backbone,
+                "results interpretation": self.model_backbone,
+                "report writing": self.model_backbone,
+                "report refinement": self.model_backbone,
+            }
 
         ##########################################
         ####### COMPUTE BUDGET PARAMETERS ########
@@ -61,9 +76,13 @@ class LaboratoryWorkflow:
                 for subtask in subtasks:
                     self.phase_models[subtask] = agent_model_backbone
         elif type(agent_model_backbone) == dict:
-            # todo: check if valid
-            self.phase_models = agent_model_backbone
-
+            # Load models for each phase if key exists otherwise use the default model
+            for phase, subtasks in self.phases:
+                for subtask in subtasks:
+                    if subtask in agent_model_backbone:
+                        self.phase_models[subtask] = agent_model_backbone[subtask]
+                    else:
+                        self.phase_models[subtask] = self.model_backbone
 
         self.human_in_loop_flag = human_in_loop_flag
 
@@ -147,7 +166,11 @@ class LaboratoryWorkflow:
                 if type(self.phase_models) == dict:
                     if subtask in self.phase_models:
                         self.set_model(self.phase_models[subtask])
-                    else: self.set_model(f"{DEFAULT_LLM_BACKBONE}")
+                    elif os.getenv('LLM_BACKEND') is not None:
+                        self.set_model(os.getenv('LLM_BACKEND'))
+                    else:
+                        print(f"Warning: Model for subtask {subtask} not found in phase_models dictionary or passed with argument. Using default model.")
+                        self.set_model(f"{DEFAULT_LLM_BACKBONE}")
                 if (subtask not in self.phase_status or not self.phase_status[subtask]) and subtask == "literature review":
                     repeat = True
                     while repeat: repeat = self.literature_review()
@@ -243,7 +266,7 @@ class LaboratoryWorkflow:
         # instantiate mle-solver
         from papersolver import PaperSolver
         self.reference_papers = []
-        solver = PaperSolver(notes=report_notes, max_steps=self.papersolver_max_steps, plan=lab.phd.plan, exp_code=lab.phd.results_code, exp_results=lab.phd.exp_results, insights=lab.phd.interpretation, lit_review=lab.phd.lit_review, ref_papers=self.reference_papers, topic=research_topic, openai_api_key=self.openai_api_key, llm_str=self.model_backbone["report writing"], compile_pdf=compile_pdf)
+        solver = PaperSolver(notes=report_notes, max_steps=self.papersolver_max_steps, plan=lab.phd.plan, exp_code=lab.phd.results_code, exp_results=lab.phd.exp_results, insights=lab.phd.interpretation, lit_review=lab.phd.lit_review, ref_papers=self.reference_papers, topic=research_topic, openai_api_key=self.openai_api_key, llm_str=self.phase_models["report writing"], compile_pdf=compile_pdf)
         # run initialization for solver
         solver.initial_solve()
         # run solver for N mle optimization steps
@@ -307,7 +330,7 @@ class LaboratoryWorkflow:
         experiment_notes = [_note["note"] for _note in self.ml_engineer.notes if "running experiments" in _note["phases"]]
         experiment_notes = f"Notes for the task objective: {experiment_notes}\n" if len(experiment_notes) > 0 else ""
         # instantiate mle-solver
-        solver = MLESolver(dataset_code=self.ml_engineer.dataset_code, notes=experiment_notes, insights=self.ml_engineer.lit_review_sum, max_steps=self.mlesolver_max_steps, plan=self.ml_engineer.plan, openai_api_key=self.openai_api_key, llm_str=self.model_backbone["running experiments"])
+        solver = MLESolver(dataset_code=self.ml_engineer.dataset_code, notes=experiment_notes, insights=self.ml_engineer.lit_review_sum, max_steps=self.mlesolver_max_steps, plan=self.ml_engineer.plan, openai_api_key=self.openai_api_key, llm_str=self.phase_models["running experiments"])
         # run initialization for solver
         solver.initial_solve()
         # run solver for N mle optimization steps
@@ -662,8 +685,17 @@ if __name__ == "__main__":
         os.environ["ANTHROPIC_API_KEY"] = args.anthropic_api_key
 
     if not api_key and not deepseek_api_key and not google_api_key and not anthropic_api_key:
-        raise ValueError("API key must be provided via --api-key / -deepseek-api-key / --google-api-key / --anthropic-api-key argument "
-                         "or the OPENAI_API_KEY / DEEPSEEK_API_KEY / GOOGLE_API_KEY / ANTHROPIC_API_KEY environment variable.")
+        raise ValueError(
+            "API key must be provided via --api-key / -deepseek-api-key / --google-api-key / --anthropic-api-key argument "
+            "or the OPENAI_API_KEY / DEEPSEEK_API_KEY / GOOGLE_API_KEY / ANTHROPIC_API_KEY environment variable."
+        )
+
+    # Store the backend LLM to use for the agents
+    if not llm_backend:
+        raise ValueError("Please provide a valid LLM backend to use for the agents.")
+
+    os.environ["LLM_BACKEND"] = llm_backend
+    print(f"Using {llm_backend} as the backend LLM for the agents.")
 
     ##########################################################
     # Research question that the agents are going to explore #
@@ -690,7 +722,7 @@ if __name__ == "__main__":
          "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
 
         {"phases": ["data preparation", "running experiments"],
-         "note": "You are running on a MacBook laptop. You can use 'mps' with PyTorch"},
+         "note": "You are running on a Ubuntu System. You can use 'cuda' with PyTorch"},
 
         {"phases": ["data preparation", "running experiments"],
          "note": "Generate figures with very colorful and artistic design."},

@@ -51,61 +51,66 @@ def run_research_process(
     load_existing: bool = False,
     load_existing_path: str = ""
 ) -> str:
+    # Determine which LLM backend to use:
+    if api_key.strip().lower() == "ollama":
+        chosen_backend = custom_llm_backend.strip() if custom_llm_backend.strip() else llm_backend
+    else:
+        chosen_backend = llm_backend
+
+    # Prepare the command arguments
+    cmd = [
+        sys.executable, 'ai_lab_repo.py',
+        '--research-topic', research_topic,
+        '--api-key', api_key,
+        '--llm-backend', chosen_backend,
+        '--language', language,
+        '--copilot-mode', str(copilot_mode).lower(),
+        '--compile-latex', str(compile_latex).lower(),
+        '--num-papers-lit-review', str(num_papers_lit_review),
+        '--mlesolver-max-steps', str(mlesolver_max_steps),
+        '--papersolver-max-steps', str(papersolver_max_steps)
+    ]
+
+    # Add optional API keys if provided
+    if deepseek_api_key:
+        cmd.extend(['--deepseek-api-key', deepseek_api_key])
+    if google_api_key:
+        cmd.extend(['--google-api-key', google_api_key])
+    if anthropic_api_key:
+        cmd.extend(['--anthropic-api-key', anthropic_api_key])
+
+    # Add load existing flags if selected
+    if load_existing and load_existing_path and load_existing_path != "No saved states found":
+        cmd.extend([
+            '--load-existing', 'True',
+            '--load-existing-path', os.path.join('state_saves', load_existing_path)
+        ])
+
+    # Create a string version of the command for display purposes.
+    # (Note: If any argument contains spaces, additional quoting might be necessary.)
+    command_str = ' '.join(cmd)
+
+    # Build the Markdown status message with the created command
+    markdown_status = f"""**Command created:**  
+<details>
+    <summary>Click to view the command created</summary>
+    <pre>{command_str}</pre>
+</details>
+"""
+
+    # Now attempt to open a new terminal window with the research process
     try:
-        # Determine which LLM backend to use:
-        # For Ollama, if a custom backend is provided, use it;
-        # otherwise, use the dropdown value.
-        if api_key.strip().lower() == "ollama":
-            chosen_backend = custom_llm_backend.strip() if custom_llm_backend.strip() else llm_backend
-        else:
-            chosen_backend = llm_backend
-
-        # Prepare the command arguments
-        cmd = [
-            sys.executable, 'ai_lab_repo.py',
-            '--research-topic', research_topic,
-            '--api-key', api_key,
-            '--llm-backend', chosen_backend,
-            '--language', language,
-            '--copilot-mode', str(copilot_mode).lower(),
-            '--compile-latex', str(compile_latex).lower(),
-            '--num-papers-lit-review', str(num_papers_lit_review),
-            '--mlesolver-max-steps', str(mlesolver_max_steps),
-            '--papersolver-max-steps', str(papersolver_max_steps)
-        ]
-
-        # Add DeepSeek API key if provided
-        if deepseek_api_key:
-            cmd.extend(['--deepseek-api-key', deepseek_api_key])
-
-        # Add Google API key if provided
-        if google_api_key:
-            cmd.extend(['--google-api-key', google_api_key])
-
-        # Add Anthropic API key if provided
-        if anthropic_api_key:
-            cmd.extend(['--anthropic-api-key', anthropic_api_key])
-
-        # Add load existing flags if selected
-        if load_existing and load_existing_path and load_existing_path != "No saved states found":
-            cmd.extend([
-                '--load-existing', 'True',
-                '--load-existing-path', os.path.join('state_saves', load_existing_path)
-            ])
-
-        # Open a new terminal window with the research process
         if sys.platform == 'win32':
             subprocess.Popen(['start', 'cmd', '/k'] + cmd, shell=True)
         elif sys.platform == 'darwin':
             subprocess.Popen(['open', '-a', 'Terminal'] + cmd)
         else:
             subprocess.Popen(['x-terminal-emulator', '-e'] + cmd)
-
-        return "Research process started in a new terminal window. Please check the terminal for progress."
+        markdown_status += "\n**Research process started in a new terminal window.**"
     except Exception as e:
-        error_message = f"Error starting research process: {e}"
-        print(error_message)
-        return error_message
+        markdown_status += f"\n**Error starting research process:** {e}"
+
+    return markdown_status
 
 
 def create_gradio_config() -> gr.Blocks:
@@ -134,7 +139,7 @@ def create_gradio_config() -> gr.Blocks:
 
         with gr.Row():
             with gr.Column():
-                gr.Markdown("## Research Configuration")
+                gr.Markdown("## Basic Configuration")
                 research_topic = gr.Textbox(
                     label="Research Topic",
                     placeholder="Enter your research idea...",
@@ -174,6 +179,30 @@ def create_gradio_config() -> gr.Blocks:
                         value="English"
                     )
 
+                # Custom LLM Backend textbox for Ollama.
+                # This is optional and only used when API key is set to "ollama".
+                custom_llm_backend = gr.Textbox(
+                    label="Custom LLM Backend (For Ollama)",
+                    placeholder="Enter your custom model string (optional)",
+                    value=""
+                )
+
+            with gr.Column():
+                gr.Markdown("## Advanced Configuration")
+                with gr.Accordion(label="Instructions for Use:", open=True):
+                    gr.Markdown(
+                        """
+                        - Fill in the research configuration.
+                        - Optionally load a previous research state.
+                        - **For standard models:** Select the desired backend from the dropdown.
+                        - **For Ollama:** Set the API key to `ollama` and, if needed, enter your custom model string in the **Custom LLM Backend** field.
+                        - If the custom field is left empty when using Ollama, the dropdown value will be used.
+                        - Click **Start Research in Terminal**.
+                        - A new terminal window will open with the research process.
+                        """
+                    )
+
+                # Configuration for the research process
                 with gr.Row():
                     copilot_mode = gr.Checkbox(label="Enable Human-in-Loop Mode")
                     compile_latex = gr.Checkbox(label="Compile LaTeX", value=True)
@@ -202,48 +231,28 @@ def create_gradio_config() -> gr.Blocks:
                     )
                     refresh_saves_btn = gr.Button("Refresh Saved States")
 
-                # Custom LLM Backend textbox for Ollama.
-                # This is optional and only used when API key is set to "ollama".
-                custom_llm_backend = gr.Textbox(
-                    label="Custom LLM Backend (For Ollama)",
-                    placeholder="Enter your custom model string (optional)",
-                    value=""
-                )
+        submit_btn = gr.Button("Start Research in Terminal", variant="primary")
 
-                submit_btn = gr.Button("Start Research in Terminal", variant="primary")
-
-            with gr.Column():
-                gr.Markdown("## Instructions")
-                gr.Markdown(
-                    """
-                    - Fill in the research configuration.
-                    - Optionally load a previous research state.
-                    - **For standard models:** Select the desired backend from the dropdown.
-                    - **For Ollama:** Set the API key to `ollama` and, if needed, enter your custom model string in the **Custom LLM Backend** field.
-                    - If the custom field is left empty when using Ollama, the dropdown value will be used.
-                    - Click **Start Research in Terminal**.
-                    - A new terminal window will open with the research process.
-                    """
-                )
+        with gr.Accordion(label="Status", open=True):
+            # Connect submit button to the research process.
+            # Output is gr.Markdown so that the returned Markdown is rendered.
+            submit_btn.click(
+                fn=run_research_process,
+                inputs=[
+                    research_topic, api_key, llm_backend, custom_llm_backend, language,
+                    copilot_mode, compile_latex, num_papers_lit_review,
+                    mlesolver_max_steps, papersolver_max_steps,
+                    deepseek_api_key, google_api_key, anthropic_api_key,
+                    load_existing, existing_saves,
+                ],
+                outputs=gr.Markdown()
+            )
 
         # Instead of returning just a list, return a new Dropdown from refresh_saves_dropdown()
         refresh_saves_btn.click(
             fn=refresh_saves_dropdown,
             inputs=None,
             outputs=existing_saves
-        )
-
-        # Connect submit button to a research process with the new custom_llm_backend input.
-        submit_btn.click(
-            fn=run_research_process,
-            inputs=[
-                research_topic, api_key, llm_backend, custom_llm_backend, language,
-                copilot_mode, compile_latex, num_papers_lit_review,
-                mlesolver_max_steps, papersolver_max_steps,
-                deepseek_api_key, google_api_key, anthropic_api_key,
-                load_existing, existing_saves,
-            ],
-            outputs=gr.Textbox(label="Status")
         )
 
     return demo

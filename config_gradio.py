@@ -61,7 +61,6 @@ def run_research_process(
     cmd = [
         sys.executable, 'ai_lab_repo.py',
         '--research-topic', research_topic,
-        '--api-key', api_key,
         '--llm-backend', chosen_backend,
         '--language', language,
         '--copilot-mode', str(copilot_mode).lower(),
@@ -72,12 +71,22 @@ def run_research_process(
     ]
 
     # Add optional API keys if provided
+    if api_key:
+        cmd.extend(['--api-key', api_key])
     if deepseek_api_key:
         cmd.extend(['--deepseek-api-key', deepseek_api_key])
     if google_api_key:
         cmd.extend(['--google-api-key', google_api_key])
     if anthropic_api_key:
         cmd.extend(['--anthropic-api-key', anthropic_api_key])
+
+    # Valid API keys are required for the research process to start
+    if not api_key and not deepseek_api_key and not google_api_key and not anthropic_api_key:
+        return "**Error starting research process:** No valid API key provided. At least one API key is required."
+
+    # Valid if ollama is selected and custom_llm_backend is empty
+    if api_key.strip().lower() == "ollama" and not custom_llm_backend.strip():
+        return "**Error starting research process:** Custom LLM Backend is required for Ollama. Enter a custom model string or select a standard model."
 
     # Add load existing flags if selected
     if load_existing and load_existing_path and load_existing_path != "No saved states found":
@@ -87,8 +96,11 @@ def run_research_process(
         ])
 
     # Create a string version of the command for display purposes.
-    # (Note: If any argument contains spaces, additional quoting might be necessary.)
-    command_str = ' '.join(cmd)
+    command_str = ' '.join([
+        arg if (arg == sys.executable or arg == "ai_lab_repo.py" or arg.startswith("--"))
+        else f'"{arg}"'
+        for arg in cmd
+    ])
 
     # Build the Markdown status message with the created command
     markdown_status = f"""**Command created:**  

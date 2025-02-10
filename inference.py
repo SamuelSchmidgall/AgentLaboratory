@@ -156,13 +156,13 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
             # Cost estimation when not using Ollama
             if openai_api_key != "ollama":
                 try:
-                    if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
+                    if model_str in [
+                        "o1-preview", "o1-mini", "o1", 
+                        "claude-3.5-sonnet", "claude-3-5-haiku",
+                        "gemini-2.0-flash", "gemini-2.0-flash-lite"
+                    ]:
                         encoding = tiktoken.encoding_for_model("gpt-4o")
                     elif model_str in ["deepseek-chat"]:
-                        encoding = tiktoken.get_encoding("cl100k_base")
-                    elif model_str in ["gemini-2.0-flash", "gemini-2.0-flash-lite"]:
-                        encoding = tiktoken.get_encoding("cl100k_base")
-                    elif model_str in ["claude-3-5-haiku", "claude-3-5-sonnet"]:
                         encoding = tiktoken.get_encoding("cl100k_base")
                     else:
                         encoding = tiktoken.encoding_for_model(model_str)

@@ -654,127 +654,126 @@ def parse_arguments():
 
 
 if __name__ == "__main__":
-    args = parse_arguments()
-
-    llm_backend = args.llm_backend
-    human_mode = args.copilot_mode.lower() == "true"
-    compile_pdf = args.compile_latex.lower() == "true"
-    load_existing = args.load_existing.lower() == "true"
     try:
-        num_papers_lit_review = int(args.num_papers_lit_review.lower())
-    except Exception:
-        raise Exception("args.num_papers_lit_review must be a valid integer!")
-    try:
-        papersolver_max_steps = int(args.papersolver_max_steps.lower())
-    except Exception:
-        raise Exception("args.papersolver_max_steps must be a valid integer!")
-    try:
-        mlesolver_max_steps = int(args.mlesolver_max_steps.lower())
-    except Exception:
-        raise Exception("args.papersolver_max_steps must be a valid integer!")
+        args = parse_arguments()
+
+        llm_backend = args.llm_backend
+        human_mode = args.copilot_mode.lower() == "true"
+        compile_pdf = args.compile_latex.lower() == "true"
+        load_existing = args.load_existing.lower() == "true"
+        try:
+            num_papers_lit_review = int(args.num_papers_lit_review.lower())
+        except Exception:
+            raise Exception("args.num_papers_lit_review must be a valid integer!")
+        try:
+            papersolver_max_steps = int(args.papersolver_max_steps.lower())
+        except Exception:
+            raise Exception("args.papersolver_max_steps must be a valid integer!")
+        try:
+            mlesolver_max_steps = int(args.mlesolver_max_steps.lower())
+        except Exception:
+            raise Exception("args.papersolver_max_steps must be a valid integer!")
 
 
-    api_key = os.getenv('OPENAI_API_KEY') or args.api_key
-    deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key
-    google_api_key = os.getenv('GOOGLE_API_KEY') or args.google_api_key
-    anthropic_api_key = os.getenv('ANTHROPIC_API_KEY') or args.anthropic_api_key
-    if args.api_key is not None and os.getenv('OPENAI_API_KEY') is None:
-        os.environ["OPENAI_API_KEY"] = args.api_key
-    if args.deepseek_api_key is not None and os.getenv('DEEPSEEK_API_KEY') is None:
-        os.environ["DEEPSEEK_API_KEY"] = args.deepseek_api_key
-    if args.google_api_key is not None and os.getenv('GOOGLE_API_KEY') is None:
-        os.environ["GOOGLE_API_KEY"] = args.google_api_key
-    if args.anthropic_api_key is not None and os.getenv('ANTHROPIC_API_KEY') is None:
-        os.environ["ANTHROPIC_API_KEY"] = args.anthropic_api_key
+        api_key = os.getenv('OPENAI_API_KEY') or args.api_key
+        deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key
+        google_api_key = os.getenv('GOOGLE_API_KEY') or args.google_api_key
+        anthropic_api_key = os.getenv('ANTHROPIC_API_KEY') or args.anthropic_api_key
+        if args.api_key is not None and os.getenv('OPENAI_API_KEY') is None:
+            os.environ["OPENAI_API_KEY"] = args.api_key
+        if args.deepseek_api_key is not None and os.getenv('DEEPSEEK_API_KEY') is None:
+            os.environ["DEEPSEEK_API_KEY"] = args.deepseek_api_key
+        if args.google_api_key is not None and os.getenv('GOOGLE_API_KEY') is None:
+            os.environ["GOOGLE_API_KEY"] = args.google_api_key
+        if args.anthropic_api_key is not None and os.getenv('ANTHROPIC_API_KEY') is None:
+            os.environ["ANTHROPIC_API_KEY"] = args.anthropic_api_key
 
-    if not api_key and not deepseek_api_key and not google_api_key and not anthropic_api_key:
-        raise ValueError(
-            "API key must be provided via --api-key / -deepseek-api-key / --google-api-key / --anthropic-api-key argument "
-            "or the OPENAI_API_KEY / DEEPSEEK_API_KEY / GOOGLE_API_KEY / ANTHROPIC_API_KEY environment variable."
-        )
+        if not api_key and not deepseek_api_key and not google_api_key and not anthropic_api_key:
+            raise ValueError(
+                "API key must be provided via --api-key / -deepseek-api-key / --google-api-key / --anthropic-api-key argument "
+                "or the OPENAI_API_KEY / DEEPSEEK_API_KEY / GOOGLE_API_KEY / ANTHROPIC_API_KEY environment variable."
+            )
 
-    # Store the backend LLM to use for the agents
-    if not llm_backend:
-        raise ValueError("Please provide a valid LLM backend to use for the agents.")
+        # Store the backend LLM to use for the agents
+        if not llm_backend:
+            raise ValueError("Please provide a valid LLM backend to use for the agents.")
 
-    os.environ["LLM_BACKEND"] = llm_backend
-    print(f"Using {llm_backend} as the backend LLM for the agents.")
+        os.environ["LLM_BACKEND"] = llm_backend
+        print(f"Using {llm_backend} as the backend LLM for the agents.")
 
-    ##########################################################
-    # Research question that the agents are going to explore #
-    ##########################################################
-    if human_mode or args.research_topic is None:
-        research_topic = input("Please name an experiment idea for AgentLaboratory to perform: ")
-    else:
-        research_topic = args.research_topic
+        ##########################################################
+        # Research question that the agents are going to explore #
+        ##########################################################
+        if human_mode or args.research_topic is None:
+            research_topic = input("Please name an experiment idea for AgentLaboratory to perform: ")
+        else:
+            research_topic = args.research_topic
 
-    task_notes_LLM = build_task_note(
-        TASK_NOTE_LLM,
-        research_topic=research_topic,
-        api_key=api_key,
-        deepseek_api_key=deepseek_api_key,
-        google_api_key=google_api_key,
-        anthropic_api_key=anthropic_api_key,
-        language=args.language,
-        llm_backend=llm_backend
-    )
-
-    ####################################################
-    ###  Stages where human input will be requested  ###
-    ####################################################
-    human_in_loop = {
-        "literature review":      human_mode,
-        "plan formulation":       human_mode,
-        "data preparation":       human_mode,
-        "running experiments":    human_mode,
-        "results interpretation": human_mode,
-        "report writing":         human_mode,
-        "report refinement":      human_mode,
-    }
-    for phase, mode in human_in_loop.items():
-        if phase not in CONFIG_HUMAN_IN_THE_LOOP:
-            continue
-        if type(CONFIG_HUMAN_IN_THE_LOOP[phase]) == bool:
-            human_in_loop[phase] = CONFIG_HUMAN_IN_THE_LOOP[phase]
-
-    ###################################################
-    ###  LLM Backend used for the different phases  ###
-    ###################################################
-    agent_models = {
-        "literature review":      llm_backend,
-        "plan formulation":       llm_backend,
-        "data preparation":       llm_backend,
-        "running experiments":    llm_backend,
-        "report writing":         llm_backend,
-        "results interpretation": llm_backend,
-        "report refinement":       llm_backend,
-    }
-    for phase, model in agent_models.items():
-        if CONFIG_AGENT_MODELS.get(phase) is None:
-            continue
-        if type(CONFIG_AGENT_MODELS[phase]) == str:
-            agent_models[phase] = CONFIG_AGENT_MODELS.get(phase)
-
-    if load_existing:
-        load_path = args.load_existing_path
-        if load_path is None:
-            raise ValueError("Please provide path to load existing state.")
-        with open(load_path, "rb") as f:
-            lab = pickle.load(f)
-    else:
-        lab = LaboratoryWorkflow(
+        task_notes_LLM = build_task_note(
+            TASK_NOTE_LLM,
             research_topic=research_topic,
-            notes=task_notes_LLM,
-            agent_model_backbone=agent_models,
-            human_in_loop_flag=human_in_loop,
-            openai_api_key=api_key,
-            compile_pdf=compile_pdf,
-            num_papers_lit_review=num_papers_lit_review,
-            papersolver_max_steps=papersolver_max_steps,
-            mlesolver_max_steps=mlesolver_max_steps,
+            api_key=api_key,
+            deepseek_api_key=deepseek_api_key,
+            google_api_key=google_api_key,
+            anthropic_api_key=anthropic_api_key,
+            language=args.language,
+            llm_backend=llm_backend
         )
 
-    try:
+        ####################################################
+        ###  Stages where human input will be requested  ###
+        ####################################################
+        human_in_loop = {
+            "literature review":      human_mode,
+            "plan formulation":       human_mode,
+            "data preparation":       human_mode,
+            "running experiments":    human_mode,
+            "results interpretation": human_mode,
+            "report writing":         human_mode,
+            "report refinement":      human_mode,
+        }
+        for phase, mode in human_in_loop.items():
+            if phase not in CONFIG_HUMAN_IN_THE_LOOP:
+                continue
+            if type(CONFIG_HUMAN_IN_THE_LOOP[phase]) == bool:
+                human_in_loop[phase] = CONFIG_HUMAN_IN_THE_LOOP[phase]
+
+        ###################################################
+        ###  LLM Backend used for the different phases  ###
+        ###################################################
+        agent_models = {
+            "literature review":      llm_backend,
+            "plan formulation":       llm_backend,
+            "data preparation":       llm_backend,
+            "running experiments":    llm_backend,
+            "report writing":         llm_backend,
+            "results interpretation": llm_backend,
+            "report refinement":       llm_backend,
+        }
+        for phase, model in agent_models.items():
+            if CONFIG_AGENT_MODELS.get(phase) is None:
+                continue
+            if type(CONFIG_AGENT_MODELS[phase]) == str:
+                agent_models[phase] = CONFIG_AGENT_MODELS.get(phase)
+
+        if load_existing:
+            load_path = args.load_existing_path
+            if load_path is None:
+                raise ValueError("Please provide path to load existing state.")
+            with open(load_path, "rb") as f:
+                lab = pickle.load(f)
+        else:
+            lab = LaboratoryWorkflow(
+                research_topic=research_topic,
+                notes=task_notes_LLM,
+                agent_model_backbone=agent_models,
+                human_in_loop_flag=human_in_loop,
+                openai_api_key=api_key,
+                compile_pdf=compile_pdf,
+                num_papers_lit_review=num_papers_lit_review,
+                papersolver_max_steps=papersolver_max_steps,
+                mlesolver_max_steps=mlesolver_max_steps,
+            )
         lab.perform_research()
     except Exception as e:
         input(f"An error occurred: {e}\nPress enter to exit.")

@@ -1,6 +1,7 @@
 from agents import *
 from copy import copy
 from common_imports import *
+from config import TASK_NOTE_LLM, CONFIG_HUMAN_IN_THE_LOOP, CONFIG_AGENT_MODELS
 from mlesolver import MLESolver
 from torch.backends.mkl import verbose
 
@@ -250,8 +251,6 @@ class LaboratoryWorkflow:
             if response == "n":
                 if verbose:
                     print("*"*40, "\n", "REVIEW COMPLETE", "\n", "*"*40)
-                    # system pause to allow for reading
-                    input(f"Press enter to continue to completion of the project.")
 
                 return False
             elif response == "y":
@@ -709,32 +708,15 @@ if __name__ == "__main__":
     else:
         research_topic = args.research_topic
 
-    task_notes_LLM = [
-        {"phases": ["plan formulation"],
-         "note": f"You should come up with a plan for TWO experiments."},
-
-        {"phases": ["plan formulation", "data preparation", "running experiments"],
-         "note": "Please use gpt-4o-mini for your experiments."},
-
-        {"phases": ["running experiments"],
-         "note": f'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
-
-        {"phases": ["running experiments"],
-         "note": f"You have access to only gpt-4o-mini using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
-
-        {"phases": ["running experiments"],
-         "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
-
-        {"phases": ["data preparation", "running experiments"],
-         "note": "You are running on a Ubuntu System. You can use 'cuda' with PyTorch"},
-
-        {"phases": ["data preparation", "running experiments"],
-         "note": "Generate figures with very colorful and artistic design."},
-    ]
-
-    task_notes_LLM.append(
-        {"phases": ["literature review", "plan formulation", "data preparation", "running experiments", "results interpretation", "report writing", "report refinement"],
-        "note": f"You should always write in the following language to converse and to write the report {args.language}"},
+    task_notes_LLM = build_task_note(
+        TASK_NOTE_LLM,
+        research_topic=research_topic,
+        api_key=api_key,
+        deepseek_api_key=deepseek_api_key,
+        google_api_key=google_api_key,
+        anthropic_api_key=anthropic_api_key,
+        language=args.language,
+        llm_backend=llm_backend
     )
 
     ####################################################
@@ -749,6 +731,11 @@ if __name__ == "__main__":
         "report writing":         human_mode,
         "report refinement":      human_mode,
     }
+    for phase, mode in human_in_loop.items():
+        if phase not in CONFIG_HUMAN_IN_THE_LOOP:
+            continue
+        if type(CONFIG_HUMAN_IN_THE_LOOP[phase]) == bool:
+            human_in_loop[phase] = CONFIG_HUMAN_IN_THE_LOOP[phase]
 
     ###################################################
     ###  LLM Backend used for the different phases  ###
@@ -760,8 +747,13 @@ if __name__ == "__main__":
         "running experiments":    llm_backend,
         "report writing":         llm_backend,
         "results interpretation": llm_backend,
-        "paper refinement":       llm_backend,
+        "report refinement":       llm_backend,
     }
+    for phase, model in agent_models.items():
+        if CONFIG_AGENT_MODELS.get(phase) is None:
+            continue
+        if type(CONFIG_AGENT_MODELS[phase]) == str:
+            agent_models[phase] = CONFIG_AGENT_MODELS.get(phase)
 
     if load_existing:
         load_path = args.load_existing_path
@@ -782,10 +774,9 @@ if __name__ == "__main__":
             mlesolver_max_steps=mlesolver_max_steps,
         )
 
-    lab.perform_research()
+    try:
+        lab.perform_research()
+    except Exception as e:
+        input(f"An error occurred: {e}\nPress enter to exit.")
 
-
-
-
-
-
+    input("The research project has been completed. Press enter to exit.")

@@ -14,3 +14,4 @@ state_saves/*
 __pycache__/*
 Figure*.png
 testrun.py
+/data/

@@ -118,4 +118,10 @@ def extract_prompt(text, word):
     extracted_code = "\n".join(code_blocks).strip()
     return extracted_code
 
-
+def build_task_note(task_note, **kwargs):
+    # Replace the `{{variable}}` placeholders in the task note with the provided values
+    for note in task_note:
+        for key, value in kwargs.items():
+            placeholder = f"{{{{{key}}}}}"
+            note["note"] = note["note"].replace(placeholder, str(value))
+    return task_note

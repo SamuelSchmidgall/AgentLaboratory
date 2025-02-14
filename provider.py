@@ -34,7 +34,6 @@ class OpenaiProvider:
 
         if api_key == "ollama":
             ollama_max_tokens = int(os.getenv("OLLAMA_MAX_TOKENS", 2048))
-            print(ollama_max_tokens)
             if version == "0.28":
                 if temperature is None:
                     completion = openai.ChatCompletion.create(

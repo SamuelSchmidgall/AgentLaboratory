@@ -4,6 +4,7 @@ import time
 
 from config import GOOGLE_GENERATIVE_API_BASE_URL, DEEPSEEK_API_BASE_URL, OLLAMA_API_BASE_URL
 from provider import AnthropicProvider, OpenaiProvider
+from utils import remove_thinking_process
 
 TOKENS_IN = dict()
 TOKENS_OUT = dict()
@@ -158,6 +159,9 @@ def query_model(model_str, prompt, system_prompt,
                 )
             else:
                 raise Exception(f"Model {model_str} not found")
+
+            # Remove the thinking process from the answer
+            answer = remove_thinking_process(answer)
 
             # Cost estimation when not using Ollama
             if preloaded_openai_api != "ollama":

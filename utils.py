@@ -125,3 +125,12 @@ def build_task_note(task_note, **kwargs):
             placeholder = f"{{{{{key}}}}}"
             note["note"] = note["note"].replace(placeholder, str(value))
     return task_note
+
+def remove_thinking_process(text):
+    """
+    Remove the first occurrence of a substring enclosed in <thinking>...</thinking> or <think>...</think>,
+    even if it spans multiple lines.
+    """
+    pattern = r'<(?:thinking|think)>.*?</(?:thinking|think)>'
+    # Using re.DOTALL allows '.' to match newline characters.
+    return re.sub(pattern, '', text, count=1, flags=re.DOTALL)

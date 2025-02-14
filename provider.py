@@ -1,6 +1,9 @@
+import os
+
 import anthropic
 import openai
-from openai import OpenAI
+from openai import OpenAI, NotGiven
+from skimage.morphology import max_tree
 
 
 class OpenaiProvider:
@@ -29,26 +32,64 @@ class OpenaiProvider:
 
         version = openai.__version__
 
-        if version == "0.28":
-            if temperature is None:
-                completion = openai.ChatCompletion.create(
-                    model=model_name,
-                    messages=messages,
-                )
+        if api_key == "ollama":
+            ollama_max_tokens = int(os.getenv("OLLAMA_MAX_TOKENS", 2048))
+            print(ollama_max_tokens)
+            if version == "0.28":
+                if temperature is None:
+                    completion = openai.ChatCompletion.create(
+                        model=model_name,
+                        messages=messages,
+                        max_tokens=ollama_max_tokens,
+                    )
+                else:
+                    completion = openai.ChatCompletion.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=ollama_max_tokens,
+                    )
             else:
-                completion = openai.ChatCompletion.create(
-                    model=model_name,
-                    messages=messages,
-                    temperature=temperature,
-                )
+                client = OpenAI(**client_config)
+                if temperature is None:
+                    completion = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        max_tokens=ollama_max_tokens,
+                    )
+                else:
+                    completion = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=ollama_max_tokens,
+                    )
         else:
-            client = OpenAI(**client_config)
-            if temperature is None:
-                completion = client.chat.completions.create(
-                    model=model_name, messages=messages)
+            if version == "0.28":
+                if temperature is None:
+                    completion = openai.ChatCompletion.create(
+                        model=model_name,
+                        messages=messages,
+                    )
+                else:
+                    completion = openai.ChatCompletion.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=temperature,
+                    )
             else:
-                completion = client.chat.completions.create(
-                    model=model_name, messages=messages, temperature=temperature)
+                client = OpenAI(**client_config)
+                if temperature is None:
+                    completion = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                    )
+                else:
+                    completion = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=temperature,
+                    )
 
         return completion.choices[0].message.content
 

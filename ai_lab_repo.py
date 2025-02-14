@@ -649,6 +649,13 @@ def parse_arguments():
         help='Total number of paper-solver steps'
     )
 
+    parser.add_argument(
+        '--ollama-max-tokens',
+        type=str,
+        default="2048",
+        help='Total number of tokens to use for OLLAMA'
+    )
+
 
     return parser.parse_args()
 
@@ -674,6 +681,14 @@ if __name__ == "__main__":
         except Exception:
             raise Exception("args.papersolver_max_steps must be a valid integer!")
 
+        # If using ollama, set the max tokens
+        if args.api_key is not None:
+            if args.api_key == "ollama":
+                try:
+                    ollama_max_tokens = int(args.ollama_max_tokens.lower())
+                    os.environ["OLLAMA_MAX_TOKENS"] = str(ollama_max_tokens)
+                except Exception:
+                    raise Exception("args.ollama_max_tokens must be a valid integer!")
 
         api_key = os.getenv('OPENAI_API_KEY') or args.api_key
         deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key
@@ -748,7 +763,7 @@ if __name__ == "__main__":
             "running experiments":    llm_backend,
             "report writing":         llm_backend,
             "results interpretation": llm_backend,
-            "report refinement":       llm_backend,
+            "report refinement":      llm_backend,
         }
         for phase, model in agent_models.items():
             if CONFIG_AGENT_MODELS.get(phase) is None:

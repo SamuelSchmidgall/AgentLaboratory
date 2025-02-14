@@ -39,6 +39,7 @@ def run_research_process(
     api_key: str,
     llm_backend: str,
     custom_llm_backend: str,
+    ollama_max_tokens: Any,
     language: str,
     copilot_mode: bool,
     compile_latex: bool,
@@ -84,9 +85,14 @@ def run_research_process(
     if not api_key and not deepseek_api_key and not google_api_key and not anthropic_api_key:
         return "**Error starting research process:** No valid API key provided. At least one API key is required."
 
-    # Valid if ollama is selected and custom_llm_backend is empty
-    if api_key.strip().lower() == "ollama" and not custom_llm_backend.strip():
-        return "**Error starting research process:** Custom LLM Backend is required for Ollama. Enter a custom model string or select a standard model."
+    # For Ollama, require a custom LLM backend and add the custom max tokens
+    if api_key.strip().lower() == "ollama":
+        if not custom_llm_backend.strip():
+            return "**Error starting research process:** Custom LLM Backend is required for Ollama. Enter a custom model string or select a standard model."
+        if not ollama_max_tokens:
+            return "**Error starting research process:** Custom Max Tokens for Ollama is required. Enter a valid integer value."
+        # Append custom max tokens for Ollama
+        cmd.extend(['--ollama-max-tokens', str(int(ollama_max_tokens))])
 
     # Add load existing flags if selected
     if load_existing and load_existing_path and load_existing_path != "No saved states found":
@@ -198,6 +204,13 @@ def create_gradio_config() -> gr.Blocks:
                     placeholder="Enter your custom model string (optional)",
                     value=""
                 )
+                # Custom max tokens for Ollama
+                ollama_max_tokens = gr.Number(
+                    label="Custom Max Tokens for Ollama",
+                    value=2048,
+                    precision=0,
+                    info="Set the maximum tokens for the Ollama model (only used if API key is 'ollama')"
+                )
 
             with gr.Column():
                 gr.Markdown("## Advanced Configuration")
@@ -207,7 +220,7 @@ def create_gradio_config() -> gr.Blocks:
                         - Fill in the research configuration.
                         - Optionally load a previous research state.
                         - **For standard models:** Select the desired backend from the dropdown.
-                        - **For Ollama:** Set the API key to `ollama` and, if needed, enter your custom model string in the **Custom LLM Backend** field.
+                        - **For Ollama:** Set the API key to `ollama` and, if needed, enter your custom model string and max tokens in the **Custom LLM Backend** and **Custom Max Tokens for Ollama** fields.
                         - If the custom field is left empty when using Ollama, the dropdown value will be used.
                         - Click **Start Research in Terminal**.
                         - A new terminal window will open with the research process.
@@ -251,7 +264,7 @@ def create_gradio_config() -> gr.Blocks:
             submit_btn.click(
                 fn=run_research_process,
                 inputs=[
-                    research_topic, api_key, llm_backend, custom_llm_backend, language,
+                    research_topic, api_key, llm_backend, custom_llm_backend, ollama_max_tokens, language,
                     copilot_mode, compile_latex, num_papers_lit_review,
                     mlesolver_max_steps, papersolver_max_steps,
                     deepseek_api_key, google_api_key, anthropic_api_key,

@@ -40,9 +40,8 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
 
 ## 🖥️ Installation
 
-### Python venv option
-
-* We recommend using python 3.12
+> [!IMPORTANT]
+> We recommend using python 3.12
 
 1. **Clone the GitHub Repository**: Begin by cloning the repository using the command:
     ```bash
@@ -50,12 +49,17 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
     ```
 
 2. **Set up and Activate Python Environment**
+    
+    Python venv option
     ```bash
     python -m venv venv_agent_lab
-    ```
-    - Now activate this environment:
-    ```bash
     source venv_agent_lab/bin/activate
+    ```
+   
+    Conda option
+    ```bash
+    conda create -n agent_lab python=3.12
+    conda activate agent_lab
     ```
 
 3. **Install required libraries**
@@ -68,9 +72,9 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
     pip install gradio==4.44.1
     ```
 
-    > [!NOTE]
-    > This is only required for the current version of web interface. 
-    > We will move to `Flask` in the future for capability of the package.
+> [!NOTE]
+> This is only required for the current version of web interface. 
+> We will move to `Flask` in the future for capability of the package.
 
 5. **Install pdflatex [OPTIONAL]**
 
@@ -91,20 +95,22 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
     ```
     
     - This enables latex source to be compiled by the agents.
-    > [!IMPORTANT] 
-    > If this step cannot be run due to not having sudo access, 
-      pdf compiling can be turned off via running Agent Laboratory 
-      via setting the `--compile-latex` flag to false: `--compile-latex "false"`.
-      Or you can disable by unchecked the `Compile LaTeX` option in the web interface.
+> [!IMPORTANT] 
+> If this step cannot be run due to not having sudo access, 
+pdf compiling can be turned off via running Agent Laboratory 
+via setting the `--compile-latex` flag to false: `--compile-latex "false"`.
+Or you can disable by unchecked the `Compile LaTeX` option in the web interface.
 
-6. **Set up the configuration file**
+## 🚀 Quick Start
+
+1. **Set up the configuration file**
 
    - You can set up the configuration file by editing the `config.py` file.
    - See the [configuration file](./config.py) for more details.
 
-7. **Now run Agent Laboratory!**
+2. **Now run Agent Laboratory!**
 
-    #### Basic Usage of Agent Laboratory in web interface
+    #### Basic Usage of Agent Laboratory in Web Interface
     ```bash
     python config_gradio.py
     ```
@@ -124,10 +130,6 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
       - `--google-api-key`: Google API key
       - `--anthropic-api-key`: Anthropic API key
 
-    > [!NOTE]
-    > You must at least provide an API key for use. 
-    > Even you run a local Ollama, you must provide an "ollama" string as the API key.
-
     **LLM Settings:**
     - `--llm-backend`: Backend LLM to use (default: "o1-mini"), please ensure your model string is correct, here is some common models:
       - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
@@ -136,10 +138,6 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
       - Google: "gemini-2.0-flash", "gemini-2.0-flash"
       - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
       - `--ollama-max-tokens`: Max tokens for OLLAMA (default: 2048), 
-    
-    > [!TIP] Best Practice or Ollama
-    > Set the `--ollama-max-tokens` to the model real context length (Ex: 128000 for `qwen2.5:32b`) for much better performance.
-    > Use the model that support `tools` as the Agent Laboratory will instruct the model to output formatted code or actions (This is kinda needed for the current version of Agent Laboratory).
 
     **Research Parameters:**
     - `--research-topic`: Your research topic/idea or a open-ended question to ask, this **must be provided**
@@ -174,11 +172,19 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
     python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --mlesolver-max-steps "5" --papersolver-max-steps "7" --language "Spanish"
     ```
     
-    Load from existing state:
+    Load from the existing state:
     ```bash
     python ai_lab_repo.py --api-key "API_KEY_HERE" --load-existing "true" --research-topic "YOUR RESEARCH IDEA" --load-existing-path "state_saves/results_interpretation.pkl"
     ```
     </details>
+
+> [!NOTE]
+> You must at least provide an API key for use. 
+> Even when you run a local Ollama, you must provide an "ollama" string as the API key.
+
+> [!TIP]
+> - Set the `--ollama-max-tokens` to the model real context length (Ex: 128000 for `qwen2.5:32b`) for much better performance.
+> - Use the model that supports `tools` as the Agent Laboratory will instruct the model to output formatted code or actions (This is kinda needed for the current version of Agent Laboratory).
 
 -----
 
@@ -248,7 +254,7 @@ All of your progress is saved by default in the `state_saves` variable, which st
 ##### **For Web Interface**
 
 You can check out the `Resume Previous Research` section to load from a previous state.
-By checking the `Load Existing Research State` flag and select the stage you want to load from, you can easily load from a previous state.
+By checking the `Load Existing Research State` flag and then select the stage you want to load from, you can easily load from a previous state.
 If the state is not up-to-date, you can always click the `Refresh Saved States` button to refresh the saved states.
 
 ##### **For CLI**

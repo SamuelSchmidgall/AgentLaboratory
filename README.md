@@ -35,6 +35,9 @@
 
 * **OpenAI**: o1, o1-preview, o1-mini, gpt-4o
 * **DeepSeek**: deepseek-chat (deepseek-v3)
+* **Anthropic**: claude-3-5-sonnet, claude-3-5-haiku
+* **Google**: gemini-2.0-flash, gemini-2.0-flash
+* **Ollama**: Any model that you can find in the [Ollama Website](https://ollama.com/search)
 
 To select a specific llm set the flag `--llm-backend="llm_model"` for example `--llm-backend="gpt-4o"` or `--llm-backend="deepseek-chat"`. Please feel free to add a PR supporting new models according to your need!
 
@@ -132,11 +135,11 @@ Or you can disable by unchecked the `Compile LaTeX` option in the web interface.
 
     **LLM Settings:**
     - `--llm-backend`: Backend LLM to use (default: "o1-mini"), please ensure your model string is correct, here is some common models:
-    - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
-    - DeepSeek: "deepseek-chat" (deepseek-v3)
-    - Anthropic: "claude-3-5-sonnet", "claude-3-5-haiku"
-    - Google: "gemini-2.0-flash", "gemini-2.0-flash"
-    - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
+      - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
+      - DeepSeek: "deepseek-chat" (deepseek-v3)
+      - Anthropic: "claude-3-5-sonnet", "claude-3-5-haiku"
+      - Google: "gemini-2.0-flash", "gemini-2.0-flash"
+      - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
     - `--ollama-max-tokens`: Max tokens for OLLAMA (default: 2048), 
 
     **Research Parameters:**

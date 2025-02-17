@@ -63,65 +63,171 @@ source venv_agent_lab/bin/activate
 pip install -r requirements.txt
 ```
 
-4. **Install pdflatex [OPTIONAL]**
+4. **Install Higher Version of Gradio**
+```bash
+pip install gradio==4.44.1
+```
+
+> [!NOTE]
+> This is only required for the current version of web interface. 
+> We will move to `Flask` in the future for capability of the package.
+
+5. **Install pdflatex [OPTIONAL]**
+
+For Ubuntu:
 ```bash
 sudo apt install pdflatex
 ```
+
+If you find the package is not available, 
+you can install it via the following commands:
+```bash
+sudo apt-get install texlive-latex-base
+
+sudo apt-get install texlive-fonts-recommended
+sudo apt-get install texlive-fonts-extra
+
+sudo apt-get install texlive-latex-extra
+```
+
 - This enables latex source to be compiled by the agents.
-- **[IMPORTANT]** If this step cannot be run due to not having sudo access, pdf compiling can be turned off via running Agent Laboratory via setting the `--compile-latex` flag to false: `--compile-latex "false"`
+> [!IMPORTANT] 
+> If this step cannot be run due to not having sudo access, 
+  pdf compiling can be turned off via running Agent Laboratory 
+  via setting the `--compile-latex` flag to false: `--compile-latex "false"`.
+  Or you can disable by unchecked the `Compile LaTeX` option in the web interface.
+
+6. **Set up the configuration file**
+
+- You can set up the configuration file by editing the `config.py` file.
+- See the [configuration file](./config.py) for more details.
+
+7. **Now run Agent Laboratory!**
+
+#### Basic Usage of Agent Laboratory in web interface
+```bash
+python config_gradio.py
+```
+
+#### Basic Usage of Agent Laboratory in CLI
+```bash
+python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA"
+```
+
+#### Available Configuration Options
+
+**API Keys:**
+- `--api-key`: OpenAI API key or set to "ollama" for Ollama usage **(required)**
+  - `--deepseek-api-key`: DeepSeek API key 
+  - `--google-api-key`: Google API key
+  - `--anthropic-api-key`: Anthropic API key
+
+> [!NOTE]
+> You must at least provide an API key for use. 
+> Even you run a local Ollama, you must provide an "ollama" string as the API key.
+
+**LLM Settings:**
+- `--llm-backend`: Backend LLM to use (default: "o1-mini"), please ensure your model string is correct, here is some common models:
+  - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
+  - DeepSeek: "deepseek-chat" (deepseek-v3)
+  - Anthropic: "claude-3-5-sonnet", "claude-3-5-haiku"
+  - Google: "gemini-2.0-flash", "gemini-2.0-flash"
+  - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
+  - `--ollama-max-tokens`: Max tokens for OLLAMA (default: 2048), 
+
+> [!TIP] Best Practice or Ollama
+> - Set the `--ollama-max-tokens` to the model real context length
+    (Ex: 128000 for `qwen2.5:32b`) for much better performance.
+>   - Use the model that support `tools` as the Agent Laboratory will instruct the model
+      to output formatted code or actions (This is kinda needed for the current version of Agent Laboratory).
+
+**Research Parameters:**
+- `--research-topic`: Your research topic/idea or a open-ended question to ask, this **must be provided**
+  - `--language`: Operating language (default: "English") which will instruct the agents to perform research in your preferred language (Not fully supported yet)
+  - `--num-papers-lit-review`: Number of papers for literature review (default: 5)
+  - `--mlesolver-max-steps`: Steps for MLE solver (default: 3)
+  - `--papersolver-max-steps`: Steps for paper solver (default: 5)
+
+**Operation Modes:**
+- `--copilot-mode`: Enable human interaction mode (default: "false"), you need check terminal for input in this mode
+  - `--compile-latex`: Enable LaTeX PDF compilation (default: "true"), **please ensure you have pdflatex installed**
+
+**State Management:**
+- `--load-existing`: Load from existing state (default: "false")
+  - `--load-existing-path`: Path to load state from (e.g., "state_saves/results_interpretation.pkl")
 
 
+<details>
+<summary>📚 Example Usage</summary>
 
-5. **Now run Agent Laboratory!**
+```bash
+Basic run without PDF compilation:
+```bash
+python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --compile-latex "false"
+```
 
-`python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA"`
+Run in copilot mode:
+```bash 
+python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true"
+```
 
-or, if you don't have pdflatex installed
+Run with custom solver steps and language:
+```bash
+python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --mlesolver-max-steps "5" --papersolver-max-steps "7" --language "Spanish"
+```
 
-`python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --compile-latex "false"`
-
-### Co-Pilot mode
-
-To run Agent Laboratory in copilot mode, simply set the copilot-mode flag to `"true"`
-
-`python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true"`
+Load from existing state:
+```bash
+python ai_lab_repo.py --api-key "API_KEY_HERE" --load-existing "true" --research-topic "YOUR RESEARCH IDEA" --load-existing-path "state_saves/results_interpretation.pkl"
+```
+</details>
 
 -----
+
 ## Tips for better research outcomes
 
 
 #### [Tip #1] 📝 Make sure to write extensive notes! 📝
 
-**Writing extensive notes is important** for helping your agent understand what you're looking to accomplish in your project, as well as any style preferences. Notes can include any experiments you want the agents to perform, providing API keys, certain plots or figures you want included, or anything you want the agent to know when performing research.
+**Writing extensive notes is important** for helping your agent understand what you're looking to accomplish in your project, 
+as well as any style preferences. Notes can include any experiments you want the agents to perform, providing API keys, certain plots or figures you want included, or anything you want the agent to know when performing research.
 
-This is also your opportunity to let the agent know **what compute resources it has access to**, e.g. GPUs (how many, what type of GPU, how many GBs), CPUs (how many cores, what type of CPUs), storage limitations, and hardware specs.
+This is also your opportunity to let the agent know **what compute resources it has access to**, 
+e.g. GPUs (how many, what type of GPU, how many GBs), CPUs (how many cores, what type of CPUs), storage limitations, and hardware specs.
 
-In order to add notes, you must modify the task_notes_LLM structure inside of `ai_lab_repo.py`. Provided below is an example set of notes used for some of our experiments. 
+In order to add notes, you must modify the TASK_NOTE_LLM structure inside of `config.py`. 
+Provided below is an example set of notes used for some of our experiments. 
 
 
 ```
-task_notes_LLM = [
+TASK_NOTE_LLM = [
     {"phases": ["plan formulation"],
      "note": f"You should come up with a plan for TWO experiments."},
 
-    {"phases": ["plan formulation", "data preparation",  "running experiments"],
+    {"phases": ["plan formulation", "data preparation", "running experiments"],
      "note": "Please use gpt-4o-mini for your experiments."},
 
     {"phases": ["running experiments"],
-     "note": f'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
+     "note": 'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{{api_key}}"\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
 
     {"phases": ["running experiments"],
-     "note": f"You have access to only gpt-4o-mini using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
+     "note": "You have access to only gpt-4o-mini using the OpenAI API, please use the following key {{api_key}} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
 
     {"phases": ["running experiments"],
      "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
 
     {"phases": ["data preparation", "running experiments"],
-     "note": "You are running on a MacBook laptop. You can use 'mps' with PyTorch"},
+     "note": "You are running on a Ubuntu System. You can use 'cuda' with PyTorch"},
 
     {"phases": ["data preparation", "running experiments"],
      "note": "Generate figures with very colorful and artistic design."},
-    ]
+
+    {"phases": ["literature review", "plan formulation",
+                "data preparation", "running experiments",
+                "results interpretation", "report writing",
+                "report refinement"],
+     "note": "You should always write in the following language to converse and to write the report {{language}}"}
+]
 ```
 
 --------
@@ -138,9 +244,22 @@ When resources are limited, **optimize by fine-tuning smaller models** on your s
 
 #### [Tip #3] ✅ You can load previous saves from checkpoints ✅
 
-**If you lose progress, internet connection, or if a subtask fails, you can always load from a previous state.** All of your progress is saved by default in the `state_saves` variable, which stores each individual checkpoint. Just pass the following arguments when running `ai_lab_repo.py`
+**If you lose progress, internet connection, or if a subtask fails, you can always load from a previous state.** 
+All of your progress is saved by default in the `state_saves` variable, which stores each individual checkpoint. 
 
-`python ai_lab_repo.py --api-key "API_KEY_HERE" --research-topic "YOUR RESEARCH IDEA" --llm-backend "o1-mini" --load-existing True --load-existing-path "state_saves/LOAD_PATH"`
+##### **For Web Interface**
+
+You can check out the `Resume Previous Research` section to load from a previous state.
+By checking the `Load Existing Research State` flag and select the stage you want to load from, you can easily load from a previous state.
+If the state is not up-to-date, you can always click the `Refresh Saved States` button to refresh the saved states.
+
+##### **For CLI**
+
+Just pass the following arguments when running `ai_lab_repo.py`
+
+```bash
+python ai_lab_repo.py --api-key "API_KEY_HERE" --research-topic "YOUR RESEARCH IDEA" --llm-backend "o1-mini" --load-existing True --load-existing-path "state_saves/LOAD_PATH"
+```
 
 -----
 
@@ -150,8 +269,11 @@ When resources are limited, **optimize by fine-tuning smaller models** on your s
 
 If you are running Agent Laboratory in a language other than English, no problem, just make sure to provide a language flag to the agents to perform research in your preferred language. Note that we have not extensively studied running Agent Laboratory in other languages, so be sure to report any problems you encounter.
 
-For example, if you are running in Chinese:
+##### **For Web Interface**
+You can select the language in the dropdown menu. If the language you want is not available, you can edit the `config_gradio.py` file to add the language you want.
 
+##### **For CLI**
+If you are running in Chinese, you can run the following command:
 `python ai_lab_repo.py --api-key "API_KEY_HERE" --research-topic "YOUR RESEARCH IDEA (in your language)" --llm-backend "o1-mini" --language "中文"`
 
 ----

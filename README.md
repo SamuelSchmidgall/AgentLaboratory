@@ -45,142 +45,140 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
 * We recommend using python 3.12
 
 1. **Clone the GitHub Repository**: Begin by cloning the repository using the command:
-```bash
-git clone git@github.com:SamuelSchmidgall/AgentLaboratory.git
-```
+    ```bash
+    git clone git@github.com:SamuelSchmidgall/AgentLaboratory.git
+    ```
 
 2. **Set up and Activate Python Environment**
-```bash
-python -m venv venv_agent_lab
-```
-- Now activate this environment:
-```bash
-source venv_agent_lab/bin/activate
-```
+    ```bash
+    python -m venv venv_agent_lab
+    ```
+    - Now activate this environment:
+    ```bash
+    source venv_agent_lab/bin/activate
+    ```
 
 3. **Install required libraries**
-```bash
-pip install -r requirements.txt
-```
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 4. **Install Higher Version of Gradio**
-```bash
-pip install gradio==4.44.1
-```
+    ```bash
+    pip install gradio==4.44.1
+    ```
 
-> [!NOTE]
-> This is only required for the current version of web interface. 
-> We will move to `Flask` in the future for capability of the package.
+    > [!NOTE]
+    > This is only required for the current version of web interface. 
+    > We will move to `Flask` in the future for capability of the package.
 
 5. **Install pdflatex [OPTIONAL]**
 
-For Ubuntu:
-```bash
-sudo apt install pdflatex
-```
-
-If you find the package is not available, 
-you can install it via the following commands:
-```bash
-sudo apt-get install texlive-latex-base
-
-sudo apt-get install texlive-fonts-recommended
-sudo apt-get install texlive-fonts-extra
-
-sudo apt-get install texlive-latex-extra
-```
-
-- This enables latex source to be compiled by the agents.
-> [!IMPORTANT] 
-> If this step cannot be run due to not having sudo access, 
-  pdf compiling can be turned off via running Agent Laboratory 
-  via setting the `--compile-latex` flag to false: `--compile-latex "false"`.
-  Or you can disable by unchecked the `Compile LaTeX` option in the web interface.
+    For Ubuntu:
+    ```bash
+    sudo apt install pdflatex
+    ```
+    
+    If you find the package is not available, 
+    you can install it via the following commands:
+    ```bash
+    sudo apt-get install texlive-latex-base
+    
+    sudo apt-get install texlive-fonts-recommended
+    sudo apt-get install texlive-fonts-extra
+    
+    sudo apt-get install texlive-latex-extra
+    ```
+    
+    - This enables latex source to be compiled by the agents.
+    > [!IMPORTANT] 
+    > If this step cannot be run due to not having sudo access, 
+      pdf compiling can be turned off via running Agent Laboratory 
+      via setting the `--compile-latex` flag to false: `--compile-latex "false"`.
+      Or you can disable by unchecked the `Compile LaTeX` option in the web interface.
 
 6. **Set up the configuration file**
 
-- You can set up the configuration file by editing the `config.py` file.
-- See the [configuration file](./config.py) for more details.
+   - You can set up the configuration file by editing the `config.py` file.
+   - See the [configuration file](./config.py) for more details.
 
 7. **Now run Agent Laboratory!**
 
-#### Basic Usage of Agent Laboratory in web interface
-```bash
-python config_gradio.py
-```
+    #### Basic Usage of Agent Laboratory in web interface
+    ```bash
+    python config_gradio.py
+    ```
+    
+    #### Basic Usage of Agent Laboratory in CLI
 
-#### Basic Usage of Agent Laboratory in CLI
-```bash
-python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA"
-```
+    ##### 1. A simple command to run Agent Laboratory
+    ```bash
+    python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA"
+    ```
+    
+    ##### 2. Available Configuration Options
 
-#### Available Configuration Options
+    **API Keys:**
+    - `--api-key`: OpenAI API key or set to "ollama" for Ollama usage **(required)**
+      - `--deepseek-api-key`: DeepSeek API key 
+      - `--google-api-key`: Google API key
+      - `--anthropic-api-key`: Anthropic API key
 
-**API Keys:**
-- `--api-key`: OpenAI API key or set to "ollama" for Ollama usage **(required)**
-  - `--deepseek-api-key`: DeepSeek API key 
-  - `--google-api-key`: Google API key
-  - `--anthropic-api-key`: Anthropic API key
+    > [!NOTE]
+    > You must at least provide an API key for use. 
+    > Even you run a local Ollama, you must provide an "ollama" string as the API key.
 
-> [!NOTE]
-> You must at least provide an API key for use. 
-> Even you run a local Ollama, you must provide an "ollama" string as the API key.
+    **LLM Settings:**
+    - `--llm-backend`: Backend LLM to use (default: "o1-mini"), please ensure your model string is correct, here is some common models:
+      - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
+      - DeepSeek: "deepseek-chat" (deepseek-v3)
+      - Anthropic: "claude-3-5-sonnet", "claude-3-5-haiku"
+      - Google: "gemini-2.0-flash", "gemini-2.0-flash"
+      - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
+      - `--ollama-max-tokens`: Max tokens for OLLAMA (default: 2048), 
+    
+    > [!TIP] Best Practice or Ollama
+    > Set the `--ollama-max-tokens` to the model real context length (Ex: 128000 for `qwen2.5:32b`) for much better performance.
+    > Use the model that support `tools` as the Agent Laboratory will instruct the model to output formatted code or actions (This is kinda needed for the current version of Agent Laboratory).
 
-**LLM Settings:**
-- `--llm-backend`: Backend LLM to use (default: "o1-mini"), please ensure your model string is correct, here is some common models:
-  - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
-  - DeepSeek: "deepseek-chat" (deepseek-v3)
-  - Anthropic: "claude-3-5-sonnet", "claude-3-5-haiku"
-  - Google: "gemini-2.0-flash", "gemini-2.0-flash"
-  - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
-  - `--ollama-max-tokens`: Max tokens for OLLAMA (default: 2048), 
+    **Research Parameters:**
+    - `--research-topic`: Your research topic/idea or a open-ended question to ask, this **must be provided**
+      - `--language`: Operating language (default: "English") which will instruct the agents to perform research in your preferred language (Not fully supported yet)
+      - `--num-papers-lit-review`: Number of papers for literature review (default: 5)
+      - `--mlesolver-max-steps`: Steps for MLE solver (default: 3)
+      - `--papersolver-max-steps`: Steps for paper solver (default: 5)
+    
+    **Operation Modes:**
+    - `--copilot-mode`: Enable human interaction mode (default: "false"), you need check terminal for input in this mode
+      - `--compile-latex`: Enable LaTeX PDF compilation (default: "true"), **please ensure you have pdflatex installed**
+    
+    **State Management:**
+    - `--load-existing`: Load from existing state (default: "false")
+      - `--load-existing-path`: Path to load state from (e.g., "state_saves/results_interpretation.pkl")
 
-> [!TIP] Best Practice or Ollama
-> - Set the `--ollama-max-tokens` to the model real context length
-    (Ex: 128000 for `qwen2.5:32b`) for much better performance.
->   - Use the model that support `tools` as the Agent Laboratory will instruct the model
-      to output formatted code or actions (This is kinda needed for the current version of Agent Laboratory).
+    <details>
+    <summary>📚 Example Usage</summary>
 
-**Research Parameters:**
-- `--research-topic`: Your research topic/idea or a open-ended question to ask, this **must be provided**
-  - `--language`: Operating language (default: "English") which will instruct the agents to perform research in your preferred language (Not fully supported yet)
-  - `--num-papers-lit-review`: Number of papers for literature review (default: 5)
-  - `--mlesolver-max-steps`: Steps for MLE solver (default: 3)
-  - `--papersolver-max-steps`: Steps for paper solver (default: 5)
-
-**Operation Modes:**
-- `--copilot-mode`: Enable human interaction mode (default: "false"), you need check terminal for input in this mode
-  - `--compile-latex`: Enable LaTeX PDF compilation (default: "true"), **please ensure you have pdflatex installed**
-
-**State Management:**
-- `--load-existing`: Load from existing state (default: "false")
-  - `--load-existing-path`: Path to load state from (e.g., "state_saves/results_interpretation.pkl")
-
-
-<details>
-<summary>📚 Example Usage</summary>
-
-```bash
-Basic run without PDF compilation:
-```bash
-python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --compile-latex "false"
-```
-
-Run in copilot mode:
-```bash 
-python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true"
-```
-
-Run with custom solver steps and language:
-```bash
-python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --mlesolver-max-steps "5" --papersolver-max-steps "7" --language "Spanish"
-```
-
-Load from existing state:
-```bash
-python ai_lab_repo.py --api-key "API_KEY_HERE" --load-existing "true" --research-topic "YOUR RESEARCH IDEA" --load-existing-path "state_saves/results_interpretation.pkl"
-```
-</details>
+    Basic run without PDF compilation:
+    ```bash
+    python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --compile-latex "false"
+    ```
+    
+    Run in copilot mode:
+    ```bash 
+    python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true"
+    ```
+    
+    Run with custom solver steps and language:
+    ```bash
+    python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --mlesolver-max-steps "5" --papersolver-max-steps "7" --language "Spanish"
+    ```
+    
+    Load from existing state:
+    ```bash
+    python ai_lab_repo.py --api-key "API_KEY_HERE" --load-existing "true" --research-topic "YOUR RESEARCH IDEA" --load-existing-path "state_saves/results_interpretation.pkl"
+    ```
+    </details>
 
 -----
 

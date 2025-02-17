@@ -126,33 +126,33 @@ Or you can disable by unchecked the `Compile LaTeX` option in the web interface.
 
     **API Keys:**
     - `--api-key`: OpenAI API key or set to "ollama" for Ollama usage **(required)**
-      - `--deepseek-api-key`: DeepSeek API key 
-      - `--google-api-key`: Google API key
-      - `--anthropic-api-key`: Anthropic API key
+    - `--deepseek-api-key`: DeepSeek API key 
+    - `--google-api-key`: Google API key
+    - `--anthropic-api-key`: Anthropic API key
 
     **LLM Settings:**
     - `--llm-backend`: Backend LLM to use (default: "o1-mini"), please ensure your model string is correct, here is some common models:
-      - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
-      - DeepSeek: "deepseek-chat" (deepseek-v3)
-      - Anthropic: "claude-3-5-sonnet", "claude-3-5-haiku"
-      - Google: "gemini-2.0-flash", "gemini-2.0-flash"
-      - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
-      - `--ollama-max-tokens`: Max tokens for OLLAMA (default: 2048), 
+    - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
+    - DeepSeek: "deepseek-chat" (deepseek-v3)
+    - Anthropic: "claude-3-5-sonnet", "claude-3-5-haiku"
+    - Google: "gemini-2.0-flash", "gemini-2.0-flash"
+    - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
+    - `--ollama-max-tokens`: Max tokens for OLLAMA (default: 2048), 
 
     **Research Parameters:**
     - `--research-topic`: Your research topic/idea or a open-ended question to ask, this **must be provided**
-      - `--language`: Operating language (default: "English") which will instruct the agents to perform research in your preferred language (Not fully supported yet)
-      - `--num-papers-lit-review`: Number of papers for literature review (default: 5)
-      - `--mlesolver-max-steps`: Steps for MLE solver (default: 3)
-      - `--papersolver-max-steps`: Steps for paper solver (default: 5)
+    - `--language`: Operating language (default: "English") which will instruct the agents to perform research in your preferred language (Not fully supported yet)
+    - `--num-papers-lit-review`: Number of papers for literature review (default: 5)
+    - `--mlesolver-max-steps`: Steps for MLE solver (default: 3)
+    - `--papersolver-max-steps`: Steps for paper solver (default: 5)
     
     **Operation Modes:**
     - `--copilot-mode`: Enable human interaction mode (default: "false"), you need check terminal for input in this mode
-      - `--compile-latex`: Enable LaTeX PDF compilation (default: "true"), **please ensure you have pdflatex installed**
+    - `--compile-latex`: Enable LaTeX PDF compilation (default: "true"), **please ensure you have pdflatex installed**
     
     **State Management:**
     - `--load-existing`: Load from existing state (default: "false")
-      - `--load-existing-path`: Path to load state from (e.g., "state_saves/results_interpretation.pkl")
+    - `--load-existing-path`: Path to load state from (e.g., "state_saves/results_interpretation.pkl")
 
     <details>
     <summary>📚 Example Usage</summary>

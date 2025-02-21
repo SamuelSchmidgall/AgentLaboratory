@@ -2,8 +2,7 @@ import os
 
 import anthropic
 import openai
-from openai import OpenAI, NotGiven
-from skimage.morphology import max_tree
+from openai import OpenAI
 
 
 class OpenaiProvider:
@@ -102,11 +101,19 @@ class AnthropicProvider:
         temperature: float = None,
     ) -> str:
         client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model=model_name,
-            system=system_prompt,
-            messages=[{"role": "user", "content": user_prompt}],
-            max_tokens = 8192 if 'sonnet' in model_name else 4096,
-            temperature=temperature,
-        )
+        if temperature is None:
+            message = client.messages.create(
+                model=model_name,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=8192 if 'sonnet' in model_name else 4096,
+            )
+        else:
+            message = client.messages.create(
+                model=model_name,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_prompt}],
+                max_tokens=8192 if 'sonnet' in model_name else 4096,
+                temperature=temperature,
+            )
         return message.content[0].text

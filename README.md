@@ -81,7 +81,7 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
 
 5. **Install pdflatex [OPTIONAL]**
 
-    For Ubuntu:
+    ## Instructions for Ubuntu:
     ```bash
     sudo apt install pdflatex
     ```
@@ -96,6 +96,15 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
     
     sudo apt-get install texlive-latex-extra
     ```
+    
+    ## Instructions for Windows Users
+
+    To have a TeX engine on Windows, you need to install the MikTeX software. Follow these steps:
+
+    1. Go to the [MikTeX download page](https://miktex.org/download).
+    2. Download the installer for your version of Windows.
+    3. Run the installer and follow the on-screen instructions to complete the installation.
+    4. Once installed, you can verify the installation by opening a command prompt and typing `latex --version`.
     
     - This enables latex source to be compiled by the agents.
 > [!IMPORTANT] 

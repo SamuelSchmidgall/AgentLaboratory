@@ -137,7 +137,7 @@ Or you can disable by unchecked the `Compile LaTeX` option in the web interface.
     - `--llm-backend`: Backend LLM to use (default: "o1-mini"), please ensure your model string is correct, here is some common models:
       - OpenAI: "o1", "o1-preview", "o1-mini", "gpt-4o"
       - DeepSeek: "deepseek-chat" (deepseek-v3)
-      - Anthropic: "claude-3-5-sonnet", "claude-3-5-haiku"
+      - Anthropic: "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest"
       - Google: "gemini-2.0-flash", "gemini-2.0-flash"
       - Ollama: Any model that you can find in the [Ollama Website](https://ollama.com/search)
     - `--ollama-max-tokens`: Max tokens for OLLAMA (default: 2048), 

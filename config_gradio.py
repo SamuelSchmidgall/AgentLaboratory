@@ -140,8 +140,8 @@ def create_gradio_config() -> gr.Blocks:
         "gpt-4o",
         "gpt-4o-mini",
         "deepseek-chat",
-        "claude-3-5-sonnet",
-        "claude-3-5-haiku",
+        "claude-3-5-sonnet-latest",
+        "claude-3-5-haiku-latest",
         "gemini-2.0-flash",
         "gemini-2.0-flash-lite",
     ]

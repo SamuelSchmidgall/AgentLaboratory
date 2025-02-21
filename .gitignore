@@ -16,3 +16,4 @@ Figure*.png
 testrun.py
 /data/
 /.vscode
+/settings/user_settings.json

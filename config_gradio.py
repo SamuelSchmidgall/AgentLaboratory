@@ -2,10 +2,59 @@ import os
 import subprocess
 import sys
 from typing import Any
-import webbrowser
-
 import gradio as gr
 
+from settings_manager import SettingsManager
+
+# Define default values
+DEFAULT_SETTINGS = {
+    "research_topic": "",
+    "api_key": "",
+    "deepseek_api_key": "",
+    "google_api_key": "",
+    "anthropic_api_key": "",
+    "llm_backend": "o1-mini",
+    "custom_llm_backend": "",
+    "ollama_max_tokens": 2048,
+    "language": "English",
+    "copilot_mode": False,
+    "compile_latex": True,
+    "num_papers_lit_review": 5,
+    "mlesolver_max_steps": 3,
+    "papersolver_max_steps": 5,
+}
+
+settings_manager = SettingsManager()
+
+def save_user_settings(
+    research_topic, api_key, llm_backend, custom_llm_backend,
+    ollama_max_tokens, language, copilot_mode, compile_latex,
+    num_papers_lit_review, mlesolver_max_steps, papersolver_max_steps,
+    deepseek_api_key, google_api_key, anthropic_api_key
+):
+    """Save current UI settings"""
+    settings = {
+        "research_topic": research_topic,
+        "api_key": api_key,
+        "deepseek_api_key": deepseek_api_key,
+        "google_api_key": google_api_key,
+        "anthropic_api_key": anthropic_api_key,
+        "llm_backend": llm_backend,
+        "custom_llm_backend": custom_llm_backend,
+        "ollama_max_tokens": ollama_max_tokens,
+        "language": language,
+        "copilot_mode": copilot_mode,
+        "compile_latex": compile_latex,
+        "num_papers_lit_review": num_papers_lit_review,
+        "mlesolver_max_steps": mlesolver_max_steps,
+        "papersolver_max_steps": papersolver_max_steps,
+    }
+    settings_manager.save_settings(settings)
+
+def load_user_settings():
+    """Load saved UI settings"""
+    settings = settings_manager.load_settings()
+    return settings
 
 def get_existing_saves() -> list:
     """Retrieve list of existing save files from state_saves directory."""
@@ -279,6 +328,47 @@ def create_gradio_config() -> gr.Blocks:
             inputs=None,
             outputs=existing_saves
         )
+
+        # Load saved settings when initializing components
+        saved_settings = load_user_settings()
+
+        # Define default values
+        default_settings = DEFAULT_SETTINGS.copy()
+        # Update default settings with saved settings
+        default_settings.update(saved_settings)
+
+        # Update component default values with settings
+        research_topic.value = default_settings["research_topic"]
+        api_key.value = default_settings["api_key"]
+        deepseek_api_key.value = default_settings["deepseek_api_key"]
+        google_api_key.value = default_settings["google_api_key"]
+        anthropic_api_key.value = default_settings["anthropic_api_key"]
+        llm_backend.value = default_settings["llm_backend"]
+        custom_llm_backend.value = default_settings["custom_llm_backend"]
+        ollama_max_tokens.value = default_settings["ollama_max_tokens"]
+        language.value = default_settings["language"]
+        copilot_mode.value = default_settings["copilot_mode"]
+        compile_latex.value = default_settings["compile_latex"]
+        num_papers_lit_review.value = default_settings["num_papers_lit_review"]
+        mlesolver_max_steps.value = default_settings["mlesolver_max_steps"]
+        papersolver_max_steps.value = default_settings["papersolver_max_steps"]
+
+        # Add change handlers to save settings when values change
+        for component in [
+            research_topic, api_key, llm_backend, custom_llm_backend,
+            ollama_max_tokens, language, copilot_mode, compile_latex,
+            num_papers_lit_review, mlesolver_max_steps, papersolver_max_steps,
+            deepseek_api_key, google_api_key, anthropic_api_key
+        ]:
+            component.change(
+                fn=save_user_settings,
+                inputs=[
+                    research_topic, api_key, llm_backend, custom_llm_backend,
+                    ollama_max_tokens, language, copilot_mode, compile_latex,
+                    num_papers_lit_review, mlesolver_max_steps, papersolver_max_steps,
+                    deepseek_api_key, google_api_key, anthropic_api_key
+                ]
+            )
 
     return demo
 

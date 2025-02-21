@@ -18,8 +18,8 @@ def curr_cost_est():
         "gpt-4o-mini": 0.150 / 1000000,
         "o1-preview": 15.00 / 1000000,
         "o1-mini": 3.00 / 1000000,
-        "claude-3-5-sonnet-latest": 3.00 / 1000000,
-        "claude-3-5-haiku-latest": 0.8 / 1000000,
+        "claude-3-5-sonnet": 3.00 / 1000000,
+        "claude-3-5-haiku": 0.8 / 1000000,
         "deepseek-chat": 1.00 / 1000000,
         "o1": 15.00 / 1000000,
         "gemini-2.0-flash": 0.1 / 1000000,
@@ -30,8 +30,8 @@ def curr_cost_est():
         "gpt-4o-mini": 0.6 / 1000000,
         "o1-preview": 60.00 / 1000000,
         "o1-mini": 12.00 / 1000000,
-        "claude-3-5-sonnet-latest": 12.00 / 1000000,
-        "claude-3-5-haiku-latest": 1.4 / 1000000,
+        "claude-3-5-sonnet": 12.00 / 1000000,
+        "claude-3-5-haiku": 1.4 / 1000000,
         "deepseek-chat": 5.00 / 1000000,
         "o1": 60.00 / 1000000,
         "gemini-2.0-flash": 0.4 / 1000000,
@@ -110,7 +110,7 @@ def query_model(model_str, prompt, system_prompt,
                     system_prompt=system_prompt,
                     temperature=temp,
                 )
-            elif model_str == "claude-3-5-sonnet-latest" or model_str == "claude-3-5-haiku-latest":
+            elif model_str.startswith("claude-3-5-sonnet") or model_str.startswith("claude-3-5-haiku"):
                 answer = AnthropicProvider.get_response(
                     api_key=os.environ["ANTHROPIC_API_KEY"],
                     model_name=model_str,
@@ -118,6 +118,10 @@ def query_model(model_str, prompt, system_prompt,
                     system_prompt=system_prompt,
                     temperature=temp,
                 )
+                if model_str.startswith("claude-3-5-sonnet"):
+                    model_str = "claude-3-5-sonnet"
+                elif model_str.startswith("claude-3-5-haiku"):
+                    model_str = "claude-3-5-haiku"
             elif model_str == "deepseek-chat":
                 model_str = "deepseek-chat"
                 answer = OpenaiProvider.get_response(
@@ -168,7 +172,7 @@ def query_model(model_str, prompt, system_prompt,
                 try:
                     if model_str in [
                         "o1-preview", "o1-mini", "o1",
-                        "claude-3-5-sonnet-latest", "claude-3-5-haiku-latest",
+                        "claude-3-5-sonnet", "claude-3-5-haiku",
                         "gemini-2.0-flash", "gemini-2.0-flash-lite"
                     ]:
                         model_encoding = tiktoken.encoding_for_model("gpt-4o")

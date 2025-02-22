@@ -118,4 +118,19 @@ def extract_prompt(text, word):
     extracted_code = "\n".join(code_blocks).strip()
     return extracted_code
 
+def build_task_note(task_note, **kwargs):
+    # Replace the `{{variable}}` placeholders in the task note with the provided values
+    for note in task_note:
+        for key, value in kwargs.items():
+            placeholder = f"{{{{{key}}}}}"
+            note["note"] = note["note"].replace(placeholder, str(value))
+    return task_note
 
+def remove_thinking_process(text):
+    """
+    Remove the first occurrence of a substring enclosed in <thinking>...</thinking> or <think>...</think>,
+    even if it spans multiple lines.
+    """
+    pattern = r'<(?:thinking|think)>.*?</(?:thinking|think)>'
+    # Using re.DOTALL allows '.' to match newline characters.
+    return re.sub(pattern, '', text, count=1, flags=re.DOTALL)

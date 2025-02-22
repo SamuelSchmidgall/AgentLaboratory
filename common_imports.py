@@ -40,6 +40,8 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
+import torchvision
+import torchaudio
 import tensorflow as tf
 #import keras
 

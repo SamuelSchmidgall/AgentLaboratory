@@ -14,3 +14,7 @@ state_saves/*
 __pycache__/*
 Figure*.png
 testrun.py
+/data/
+/.vscode
+/settings/user_settings.json
+/AgentLaboratoryWebUI

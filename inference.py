@@ -2,6 +2,7 @@ import time, tiktoken
 from openai import OpenAI
 import openai
 import os, anthropic, json
+from utils import clip_tokens
 
 TOKENS_IN = dict()
 TOKENS_OUT = dict()
@@ -29,7 +30,7 @@ def curr_cost_est():
     }
     return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
 
-def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
+def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5", max_context_tokens=128000):
     preloaded_api = os.getenv('OPENAI_API_KEY')
     if openai_api_key is None and preloaded_api is not None:
         openai_api_key = preloaded_api
@@ -47,6 +48,8 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}]
+                
+                messages = clip_tokens(messages, model=model_str, max_tokens=max_context_tokens)
                 if version == "0.28":
                     if temp is None:
                         completion = openai.ChatCompletion.create(

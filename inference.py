@@ -160,19 +160,23 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
 
-            if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
-                encoding = tiktoken.encoding_for_model("gpt-4o")
-            elif model_str in ["deepseek-chat"]:
-                encoding = tiktoken.encoding_for_model("cl100k_base")
-            else:
-                encoding = tiktoken.encoding_for_model(model_str)
-            if model_str not in TOKENS_IN:
-                TOKENS_IN[model_str] = 0
-                TOKENS_OUT[model_str] = 0
-            TOKENS_IN[model_str] += len(encoding.encode(system_prompt + prompt))
-            TOKENS_OUT[model_str] += len(encoding.encode(answer))
-            if print_cost:
-                print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
+            try:
+                if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
+                    encoding = tiktoken.encoding_for_model("gpt-4o")
+                elif model_str in ["deepseek-chat"]:
+                    encoding = tiktoken.encoding_for_model("cl100k_base")
+                else:
+                    encoding = tiktoken.encoding_for_model(model_str)
+                if model_str not in TOKENS_IN:
+                    TOKENS_IN[model_str] = 0
+                    TOKENS_OUT[model_str] = 0
+                TOKENS_IN[model_str] += len(encoding.encode(system_prompt + prompt))
+                TOKENS_OUT[model_str] += len(encoding.encode(answer))
+                if print_cost:
+                    print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
+            except Exception as e:
+                if print_cost:
+                    print(f"Cost approximation has an error? {e}")
             return answer
         except Exception as e:
             print("Inference Exception:", e)

@@ -200,7 +200,45 @@ def run_research_process(data: dict) -> str:
 
     return markdown_status
 
+# Update the WebUI repository
+def update_webui():
+    """Pull the latest changes from the WebUI repository and rebuild if needed."""
+    webui_path = os.path.join(os.getcwd(), "AgentLaboratoryWebUI")
+    
+    try:
+        # Check if we can pull updates
+        print("Checking for WebUI updates...")
+        result = subprocess.run(
+            ["git", "pull"], 
+            check=True, 
+            cwd=webui_path, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # If the output contains "Already up to date", no rebuild is needed
+        if "Already up to date" in result.stdout:
+            return {"status": "WebUI is already up to date", "updated": False}
+        
+        # If we got here, changes were pulled, rebuild the UI
+        print("Rebuilding WebUI after update...")
+        subprocess.run(["yarn", "install"], check=True, cwd=webui_path)
+        subprocess.run(["yarn", "build"], check=True, cwd=webui_path)
+        return {"status": "WebUI has been updated and rebuilt successfully", "updated": True}
+        
+    except subprocess.CalledProcessError as e:
+        error_message = f"Error updating WebUI: {e.stderr}"
+        print(error_message)
+        return {"status": error_message, "updated": False, "error": True}
+    except Exception as e:
+        error_message = f"Unexpected error updating WebUI: {str(e)}"
+        print(error_message)
+        return {"status": error_message, "updated": False, "error": True}
+
 @app.route("/")
+@app.route("/config")
+@app.route("/monitor")
 def hello():
     return render_template("index.html")
 
@@ -230,6 +268,12 @@ def api_settings():
 def api_saves():
     saves = get_existing_saves()
     return jsonify({"saves": saves})
+
+# Endpoint to update the WebUI
+@app.route('/api/updateWebUI', methods=['POST'])
+def api_update_webui():
+    result = update_webui()
+    return jsonify(result)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

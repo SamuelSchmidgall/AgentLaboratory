@@ -87,7 +87,6 @@ DEFAULT_SETTINGS = {
     "num_papers_lit_review": 5,
     "mlesolver_max_steps": 3,
     "papersolver_max_steps": 5,
-    "task_note_llm_config_file": None,
 }
 
 settings_manager = SettingsManager()
@@ -135,7 +134,6 @@ def run_research_process(data: dict) -> str:
     anthropic_api_key     = data.get('anthropic_api_key', '')
     load_existing         = data.get('load_existing', False)
     load_existing_path    = data.get('load_existing_path', '')
-    task_note_llm_config_file = data.get('task_note_llm_config_file', None)
 
     # Choose backend based on the API key value.
     if api_key.strip().lower() == "ollama":
@@ -185,9 +183,9 @@ def run_research_process(data: dict) -> str:
             '--load-existing-path', os.path.join('state_saves', load_existing_path)
         ])
 
-    # Append task note config if provided
-    if task_note_llm_config_file:
-        cmd.extend(['--task-note-llm-config-file', task_note_llm_config_file])
+    # Append task note config if the config file exists.
+    if os.path.exists('settings/task_note_llm_config.json'):
+        cmd.extend(['--task-note-llm-config-file', 'settings/task_note_llm_config.json'])
 
     # Create a displayable command string.
     command_str = ' '.join(
@@ -320,11 +318,6 @@ def api_task_note_config():
             # Save as task note JSON format
             with open(config_file, 'w') as f:
                 json.dump(config, f, indent=2)
-            
-            # Update the settings to use this config file
-            settings = load_user_settings() or {}
-            settings['task_note_llm_config_file'] = config_file
-            save_user_settings_from_dict(settings)
             
             return jsonify({
                 "status": "success",

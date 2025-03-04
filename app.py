@@ -1,9 +1,14 @@
+import json
 import os
 import subprocess
 import sys
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+
 from settings_manager import SettingsManager
+from config import TASK_NOTE_LLM
+from utils import validate_task_note_config
+
 
 # Check if the WebUI repository is cloned
 def check_webui_cloned():
@@ -82,6 +87,7 @@ DEFAULT_SETTINGS = {
     "num_papers_lit_review": 5,
     "mlesolver_max_steps": 3,
     "papersolver_max_steps": 5,
+    "task_note_llm_config_file": None,
 }
 
 settings_manager = SettingsManager()
@@ -129,6 +135,7 @@ def run_research_process(data: dict) -> str:
     anthropic_api_key     = data.get('anthropic_api_key', '')
     load_existing         = data.get('load_existing', False)
     load_existing_path    = data.get('load_existing_path', '')
+    task_note_llm_config_file = data.get('task_note_llm_config_file', None)
 
     # Choose backend based on the API key value.
     if api_key.strip().lower() == "ollama":
@@ -177,6 +184,10 @@ def run_research_process(data: dict) -> str:
             '--load-existing', 'True',
             '--load-existing-path', os.path.join('state_saves', load_existing_path)
         ])
+
+    # Append task note config if provided
+    if task_note_llm_config_file:
+        cmd.extend(['--task-note-llm-config-file', task_note_llm_config_file])
 
     # Create a displayable command string.
     command_str = ' '.join(
@@ -274,6 +285,56 @@ def api_saves():
 def api_update_webui():
     result = update_webui()
     return jsonify(result)
+
+# Endpoint to manage the task note LLM configuration
+@app.route('/api/task_note_config', methods=['GET', 'POST'])
+def api_task_note_config():
+    if request.method == 'GET':
+        config_file = os.path.join('settings', 'task_note_llm_config.json')
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r') as f:
+                    config = json.load(f)
+                return jsonify(config)
+            except Exception as e:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Error loading task note config: {str(e)}"
+                }), 500
+        else:
+            # Return default task note config from config.py
+            return jsonify(TASK_NOTE_LLM)
+    elif request.method == 'POST':
+        config = request.get_json()
+        
+        # Validate configuration before saving
+        if not validate_task_note_config(config):
+            return jsonify({
+                "status": "error",
+                "message": "Invalid task note LLM configuration format"
+            }), 400
+            
+        try:
+            os.makedirs('settings', exist_ok=True)
+            config_file = os.path.join('settings', 'task_note_llm_config.json')
+            # Save as task note JSON format
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+            
+            # Update the settings to use this config file
+            settings = load_user_settings() or {}
+            settings['task_note_llm_config_file'] = config_file
+            save_user_settings_from_dict(settings)
+            
+            return jsonify({
+                "status": "success",
+                "message": "Task note LLM config saved successfully and set as current config"
+            })
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "message": f"Error saving task note config: {str(e)}"
+            }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

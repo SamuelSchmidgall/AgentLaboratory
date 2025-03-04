@@ -656,6 +656,11 @@ def parse_arguments():
         help='Total number of tokens to use for OLLAMA'
     )
 
+    parser.add_argument(
+        '--task-note-llm-config-file',
+        type=str,
+        help='Provide path to the task note LLM config file.'
+    )
 
     return parser.parse_args()
 
@@ -724,8 +729,23 @@ if __name__ == "__main__":
         else:
             research_topic = args.research_topic
 
+        if args.task_note_llm_config_file is not None:
+            try:
+                with open(args.task_note_llm_config_file, "r") as f:
+                    task_note_json = json.load(f)
+
+                # Verify that the JSON file is in the correct format
+                if not validate_task_note_config(task_note_json):
+                    raise ValueError("The task note LLM config file is not in the correct format.")
+            except Exception as e:
+                print(f"[Warning] Error loading the task note LLM config file: {e}")
+                # Use the default task note JSON
+                task_note_json = TASK_NOTE_LLM
+        else:
+            task_note_json = TASK_NOTE_LLM
+
         task_notes_LLM = build_task_note(
-            TASK_NOTE_LLM,
+            task_note_json,
             research_topic=research_topic,
             api_key=api_key,
             deepseek_api_key=deepseek_api_key,

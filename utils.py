@@ -134,3 +134,61 @@ def remove_thinking_process(text):
     pattern = r'<(?:thinking|think)>.*?</(?:thinking|think)>'
     # Using re.DOTALL allows '.' to match newline characters.
     return re.sub(pattern, '', text, count=1, flags=re.DOTALL)
+
+# Define allowed phases and variables according to your guide
+ALLOWED_PHASES = [
+    "literature review", "plan formulation",
+    "data preparation", "running experiments",
+    "results interpretation", "report writing",
+    "report refinement"
+]
+
+ALLOWED_VARIABLES = {
+    "research_topic", "api_key", "deepseek_api_key",
+    "google_api_key", "anthropic_api_key", "language",
+    "llm_backend"
+}
+
+def validate_task_note_config(task_note_config):
+    """
+    Validate the task note configuration based on the allowed phases and variables.
+    """
+    # Ensure the configuration is a list
+    if not isinstance(task_note_config, list):
+        raise ValueError("Configuration must be a list.")
+
+    for idx, note in enumerate(task_note_config):
+        # Each note should be a dictionary
+        if not isinstance(note, dict):
+            raise ValueError(f"Entry {idx} must be a dictionary.")
+
+        # Must contain both 'phases' and 'note'
+        if "phases" not in note or "note" not in note:
+            raise ValueError(f"Entry {idx} must have both 'phases' and 'note' keys.")
+
+        # Validate phases: it must be a list and contain only allowed values
+        phases = note["phases"]
+        if not isinstance(phases, list):
+            raise ValueError(f"'phases' in entry {idx} must be a list.")
+        for phase in phases:
+            if phase not in ALLOWED_PHASES:
+                raise ValueError(
+                    f"Invalid phase '{phase}' in entry {idx}. "
+                    f"Allowed phases are: {ALLOWED_PHASES}"
+                )
+
+        # Validate note: it must be a string
+        text = note["note"]
+        if not isinstance(text, str):
+            raise ValueError(f"'note' in entry {idx} must be a string.")
+
+        # Validate the variables inside the note using a regex that matches double curly braces
+        variables_found = re.findall(r"{{\s*(\w+)\s*}}", text)
+        for var in variables_found:
+            if var not in ALLOWED_VARIABLES:
+                raise ValueError(
+                    f"Invalid variable '{var}' in note in entry {idx}. "
+                    f"Allowed variables are: {ALLOWED_VARIABLES}"
+                )
+
+    return True

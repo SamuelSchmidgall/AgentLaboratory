@@ -1,7 +1,7 @@
 import time, tiktoken
 from openai import OpenAI
 import openai
-import os, anthropic, json
+import os, anthropic, json, ollama
 
 TOKENS_IN = dict()
 TOKENS_OUT = dict()
@@ -29,17 +29,38 @@ def curr_cost_est():
     }
     return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
 
+def compute_tokens(model_str, prompt, system_prompt, answer, print_cost): 
+    try:           
+        if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
+            encoding = tiktoken.encoding_for_model("gpt-4o")
+        elif model_str in ["deepseek-chat"]:
+            encoding = tiktoken.encoding_for_model("cl100k_base")
+        else:
+            encoding = tiktoken.encoding_for_model(model_str)
+        if model_str not in TOKENS_IN:
+            TOKENS_IN[model_str] = 0
+            TOKENS_OUT[model_str] = 0
+        TOKENS_IN[model_str] += len(encoding.encode(system_prompt + prompt))
+        TOKENS_OUT[model_str] += len(encoding.encode(answer))
+        if print_cost:
+            print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
+    except Exception as e:
+                if print_cost:
+                    print(f"Cost approximation has an error? {e}")
+
 def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
-    preloaded_api = os.getenv('OPENAI_API_KEY')
-    if openai_api_key is None and preloaded_api is not None:
-        openai_api_key = preloaded_api
-    if openai_api_key is None and anthropic_api_key is None:
-        raise Exception("No API key provided in query_model function")
-    if openai_api_key is not None:
-        openai.api_key = openai_api_key
-        os.environ["OPENAI_API_KEY"] = openai_api_key
-    if anthropic_api_key is not None:
-        os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+
+    if not model_str.startswith('ollama:'): 
+        preloaded_api = os.getenv('OPENAI_API_KEY')
+        if openai_api_key is None and preloaded_api is not None:
+            openai_api_key = preloaded_api
+        if openai_api_key is None and anthropic_api_key is None:
+            raise Exception("No API key provided in query_model function")
+        if openai_api_key is not None:
+            openai.api_key = openai_api_key
+            os.environ["OPENAI_API_KEY"] = openai_api_key
+        if anthropic_api_key is not None:
+            os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
     for _ in range(tries):
         try:
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
@@ -159,24 +180,22 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
                     completion = client.chat.completions.create(
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
-
-            try:
-                if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1"]:
-                    encoding = tiktoken.encoding_for_model("gpt-4o")
-                elif model_str in ["deepseek-chat"]:
-                    encoding = tiktoken.encoding_for_model("cl100k_base")
-                else:
-                    encoding = tiktoken.encoding_for_model(model_str)
-                if model_str not in TOKENS_IN:
-                    TOKENS_IN[model_str] = 0
-                    TOKENS_OUT[model_str] = 0
-                TOKENS_IN[model_str] += len(encoding.encode(system_prompt + prompt))
-                TOKENS_OUT[model_str] += len(encoding.encode(answer))
-                if print_cost:
-                    print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
-            except Exception as e:
-                if print_cost:
-                    print(f"Cost approximation has an error? {e}")
+            elif model_str.startswith("ollama:"): 
+                
+                response: ollama.ChatResponse = ollama.chat(
+                model=model_str[7:], 
+                messages=[ 
+                    { "role": "system", "content": system_prompt }, 
+                    { "role": "user", "content":  prompt }
+                ]
+                )
+               
+                answer = response.message.content 
+            
+            # skip token computation for models run via ollama
+            if not model_str.startswith("ollama:"): 
+                compute_tokens(model_str,prompt, system_prompt, answer, print_cost)
+           
             return answer
         except Exception as e:
             print("Inference Exception:", e)
@@ -185,4 +204,5 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic
     raise Exception("Max retries: timeout")
 
 
-#print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))
+# print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))
+# print(query_model(model_str="ollama:deepseek-r1:1.5b", prompt="hi", system_prompt="hey"))

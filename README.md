@@ -1,6 +1,5 @@
 # Agent Laboratory: Using LLM Agents as Research Assistants
 
-
 <p align="center">
   <img src="media/AgentLabLogo.png" alt="Demonstration of the flow of AgentClinic" style="width: 99%;">
 </p>
@@ -15,7 +14,7 @@
 
 ## 📖 Overview
 
-- **Agent Laboratory** is an end-to-end autonomous research workflow meant to assist **you** as the human researcher toward **implementing your research ideas**. Agent Laboratory consists of specialized agents driven by large language models to support you through the entire research workflow—from conducting literature reviews and formulating plans to executing experiments and writing comprehensive reports. 
+- **Agent Laboratory** is an end-to-end autonomous research workflow meant to assist **you** as the human researcher toward **implementing your research ideas**. Agent Laboratory consists of specialized agents driven by large language models to support you through the entire research workflow—from conducting literature reviews and formulating plans to executing experiments and writing comprehensive reports.
 - This system is not designed to replace your creativity but to complement it, enabling you to focus on ideation and critical thinking while automating repetitive and time-intensive tasks like coding and documentation. By accommodating varying levels of computational resources and human involvement, Agent Laboratory aims to accelerate scientific discovery and optimize your research productivity.
 
 <p align="center">
@@ -30,11 +29,10 @@
   <img src="media/AgentLabWF.png" alt="Demonstration of the flow of AgentClinic" style="width: 99%;">
 </p>
 
-
 ### 👾 Currently supported models
 
-* **OpenAI**: o1, o1-preview, o1-mini, gpt-4o
-* **DeepSeek**: deepseek-chat (deepseek-v3)
+- **OpenAI**: o1, o1-preview, o1-mini, gpt-4o
+- **DeepSeek**: deepseek-chat (deepseek-v3)
 
 To select a specific llm set the flag `--llm-backend="llm_model"` for example `--llm-backend="gpt-4o"` or `--llm-backend="deepseek-chat"`. Please feel free to add a PR supporting new models according to your need!
 
@@ -42,35 +40,40 @@ To select a specific llm set the flag `--llm-backend="llm_model"` for example `-
 
 ### Python venv option
 
-* We recommend using python 3.12
+- We recommend using python 3.12
 
 1. **Clone the GitHub Repository**: Begin by cloning the repository using the command:
+
 ```bash
 git clone git@github.com:SamuelSchmidgall/AgentLaboratory.git
 ```
 
 2. **Set up and Activate Python Environment**
+
 ```bash
 python -m venv venv_agent_lab
 ```
+
 - Now activate this environment:
+
 ```bash
 source venv_agent_lab/bin/activate
 ```
 
 3. **Install required libraries**
+
 ```bash
 pip install -r requirements.txt
 ```
 
 4. **Install pdflatex [OPTIONAL]**
+
 ```bash
 sudo apt install pdflatex
 ```
+
 - This enables latex source to be compiled by the agents.
 - **[IMPORTANT]** If this step cannot be run due to not having sudo access, pdf compiling can be turned off via running Agent Laboratory via setting the `--compile-latex` flag to false: `--compile-latex "false"`
-
-
 
 5. **Now run Agent Laboratory!**
 
@@ -86,9 +89,18 @@ To run Agent Laboratory in copilot mode, simply set the copilot-mode flag to `"t
 
 `python ai_lab_repo.py --api-key "API_KEY_HERE" --llm-backend "o1-mini" --research-topic "YOUR RESEARCH IDEA" --copilot-mode "true"`
 
------
-## Tips for better research outcomes
+### Running with Ollama
 
+To run Agent Laboratory locally with ollama, use prefix `ollama:` with you local model.
+
+`python ai_lab_repo.py --llm-backend "ollama:model_name" --research-topic "YOUR RESEARCH IDEA"`
+
+Example:
+`python ai_lab_repo.py --llm-backend "ollama:deepseek-r1:1.5b" --research-topic "YOUR RESEARCH IDEA"`
+
+---
+
+## Tips for better research outcomes
 
 #### [Tip #1] 📝 Make sure to write extensive notes! 📝
 
@@ -96,8 +108,7 @@ To run Agent Laboratory in copilot mode, simply set the copilot-mode flag to `"t
 
 This is also your opportunity to let the agent know **what compute resources it has access to**, e.g. GPUs (how many, what type of GPU, how many GBs), CPUs (how many cores, what type of CPUs), storage limitations, and hardware specs.
 
-In order to add notes, you must modify the task_notes_LLM structure inside of `ai_lab_repo.py`. Provided below is an example set of notes used for some of our experiments. 
-
+In order to add notes, you must modify the task_notes_LLM structure inside of `ai_lab_repo.py`. Provided below is an example set of notes used for some of our experiments.
 
 ```
 task_notes_LLM = [
@@ -124,7 +135,7 @@ task_notes_LLM = [
     ]
 ```
 
---------
+---
 
 #### [Tip #2] 🚀 Using more powerful models generally leads to better research 🚀
 
@@ -134,7 +145,7 @@ However, **it’s important to balance performance and cost-effectiveness**. Whi
 
 When resources are limited, **optimize by fine-tuning smaller models** on your specific dataset or combining pre-trained models with task-specific prompts to achieve the desired balance between performance and computational efficiency.
 
------
+---
 
 #### [Tip #3] ✅ You can load previous saves from checkpoints ✅
 
@@ -142,9 +153,7 @@ When resources are limited, **optimize by fine-tuning smaller models** on your s
 
 `python ai_lab_repo.py --api-key "API_KEY_HERE" --research-topic "YOUR RESEARCH IDEA" --llm-backend "o1-mini" --load-existing True --load-existing-path "state_saves/LOAD_PATH"`
 
------
-
-
+---
 
 #### [Tip #4] 🈯 If you are running in a language other than English 🈲
 
@@ -154,13 +163,11 @@ For example, if you are running in Chinese:
 
 `python ai_lab_repo.py --api-key "API_KEY_HERE" --research-topic "YOUR RESEARCH IDEA (in your language)" --llm-backend "o1-mini" --language "中文"`
 
-----
-
+---
 
 #### [Tip #5] 🌟 There is a lot of room for improvement 🌟
 
 There is a lot of room to improve this codebase, so if you end up making changes and want to help the community, please feel free to share the changes you've made! We hope this tool helps you!
-
 
 ## 📜 License
 
@@ -172,16 +179,14 @@ If you would like to get in touch, feel free to reach out to [sschmi46@jhu.edu](
 
 ## Reference / Bibtex
 
-
-
 ```bibtex
 @misc{schmidgall2025agentlaboratoryusingllm,
-      title={Agent Laboratory: Using LLM Agents as Research Assistants}, 
+      title={Agent Laboratory: Using LLM Agents as Research Assistants},
       author={Samuel Schmidgall and Yusheng Su and Ze Wang and Ximeng Sun and Jialian Wu and Xiaodong Yu and Jiang Liu and Zicheng Liu and Emad Barsoum},
       year={2025},
       eprint={2501.04227},
       archivePrefix={arXiv},
       primaryClass={cs.HC},
-      url={https://arxiv.org/abs/2501.04227}, 
+      url={https://arxiv.org/abs/2501.04227},
 }
 ```

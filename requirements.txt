@@ -68,6 +68,7 @@ nest-asyncio==1.6.0
 networkx==3.2.1
 nltk==3.9.1
 numpy==2.0.2
+ollama==0.4.7
 openai==1.55.1
 opt_einsum==3.4.0
 optree==0.13.1

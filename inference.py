@@ -49,16 +49,18 @@ def compute_tokens(model_str, prompt, system_prompt, answer, print_cost):
                     print(f"Cost approximation has an error? {e}")
 
 def query_model(model_str, prompt, system_prompt, openai_api_key=None, anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
-    preloaded_api = os.getenv('OPENAI_API_KEY')
-    if openai_api_key is None and preloaded_api is not None:
-        openai_api_key = preloaded_api
-    if openai_api_key is None and anthropic_api_key is None:
-        raise Exception("No API key provided in query_model function")
-    if openai_api_key is not None:
-        openai.api_key = openai_api_key
-        os.environ["OPENAI_API_KEY"] = openai_api_key
-    if anthropic_api_key is not None:
-        os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
+
+    if not model_str.startswith('ollama:'): 
+        preloaded_api = os.getenv('OPENAI_API_KEY')
+        if openai_api_key is None and preloaded_api is not None:
+            openai_api_key = preloaded_api
+        if openai_api_key is None and anthropic_api_key is None:
+            raise Exception("No API key provided in query_model function")
+        if openai_api_key is not None:
+            openai.api_key = openai_api_key
+            os.environ["OPENAI_API_KEY"] = openai_api_key
+        if anthropic_api_key is not None:
+            os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
     for _ in range(tries):
         try:
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":

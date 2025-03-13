@@ -18,3 +18,4 @@ testrun.py
 /.vscode
 /settings/user_settings.json
 /AgentLaboratoryWebUI
+settings/task_note_llm_config.json

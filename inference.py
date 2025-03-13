@@ -16,26 +16,30 @@ def curr_cost_est():
     costmap_in = {
         "gpt-4o": 2.50 / 1000000,
         "gpt-4o-mini": 0.150 / 1000000,
+        "o1": 15.00 / 1000000,
         "o1-preview": 15.00 / 1000000,
-        "o1-mini": 3.00 / 1000000,
+        "o1-mini": 1.10 / 1000000,
+        "o3-mini": 1.10 / 1000000,
+        "claude-3-7-sonnet": 3.00 / 1000000,
         "claude-3-5-sonnet": 3.00 / 1000000,
         "claude-3-5-haiku": 0.8 / 1000000,
-        "deepseek-chat": 1.00 / 1000000,
-        "o1": 15.00 / 1000000,
-        "gemini-2.0-flash": 0.1 / 1000000,
+        "deepseek-chat": 0.27 / 1000000,
+        "gemini-2.0-flash": 0.10 / 1000000,
         "gemini-2.0-flash-lite": 0.075 / 1000000,
     }
     costmap_out = {
         "gpt-4o": 10.00 / 1000000,
-        "gpt-4o-mini": 0.6 / 1000000,
-        "o1-preview": 60.00 / 1000000,
-        "o1-mini": 12.00 / 1000000,
-        "claude-3-5-sonnet": 12.00 / 1000000,
-        "claude-3-5-haiku": 1.4 / 1000000,
-        "deepseek-chat": 5.00 / 1000000,
+        "gpt-4o-mini": 0.60 / 1000000,
         "o1": 60.00 / 1000000,
-        "gemini-2.0-flash": 0.4 / 1000000,
-        "gemini-2.0-flash-lite": 0.3 / 1000000,
+        "o1-preview": 60.00 / 1000000,
+        "o1-mini": 4.40 / 1000000,
+        "o3-mini": 4.40 / 1000000,
+        "claude-3-7-sonnet": 15.00 / 1000000,
+        "claude-3-5-sonnet": 15.00 / 1000000,
+        "claude-3-5-haiku": 4.00 / 1000000,
+        "deepseek-chat": 1.10 / 1000000,
+        "gemini-2.0-flash": 0.40 / 1000000,
+        "gemini-2.0-flash-lite": 0.30 / 1000000,
     }
     return sum([costmap_in[_] * TOKENS_IN[_] for _ in TOKENS_IN]) + sum(
         [costmap_out[_] * TOKENS_OUT[_] for _ in TOKENS_OUT])
@@ -92,6 +96,15 @@ def query_model(model_str, prompt, system_prompt,
                     system_prompt=system_prompt,
                     temperature=temp,
                 )
+            elif model_str == "o3-mini":
+                model_str = "o3-mini"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('OPENAI_API_KEY'),
+                    model_name="o3-mini" if version == "0.28" else "o3-mini-2025-01-31",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                )
             elif model_str == "o1":
                 model_str = "o1"
                 answer = OpenaiProvider.get_response(
@@ -110,7 +123,10 @@ def query_model(model_str, prompt, system_prompt,
                     system_prompt=system_prompt,
                     temperature=temp,
                 )
-            elif model_str.startswith("claude-3-5-sonnet") or model_str.startswith("claude-3-5-haiku"):
+            elif (model_str.startswith("claude-3-5-sonnet") or
+                  model_str.startswith("claude-3-5-haiku") or
+                  model_str.startswith("claude-3-7-sonnet")
+            ):
                 answer = AnthropicProvider.get_response(
                     api_key=os.environ["ANTHROPIC_API_KEY"],
                     model_name=model_str,
@@ -122,6 +138,8 @@ def query_model(model_str, prompt, system_prompt,
                     model_str = "claude-3-5-sonnet"
                 elif model_str.startswith("claude-3-5-haiku"):
                     model_str = "claude-3-5-haiku"
+                elif model_str.startswith("claude-3-7-sonnet"):
+                    model_str = "claude-3-7-sonnet"
             elif model_str == "deepseek-chat":
                 model_str = "deepseek-chat"
                 answer = OpenaiProvider.get_response(
@@ -171,8 +189,8 @@ def query_model(model_str, prompt, system_prompt,
             if preloaded_openai_api != "ollama":
                 try:
                     if model_str in [
-                        "o1-preview", "o1-mini", "o1",
-                        "claude-3-5-sonnet", "claude-3-5-haiku",
+                        "o1", "o1-preview", "o1-mini", "o3-mini",
+                        "claude-3-7-sonnet", "claude-3-5-sonnet", "claude-3-5-haiku",
                         "gemini-2.0-flash", "gemini-2.0-flash-lite"
                     ]:
                         model_encoding = tiktoken.encoding_for_model("gpt-4o")

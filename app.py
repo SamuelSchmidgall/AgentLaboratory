@@ -28,7 +28,7 @@ def check_webui_cloned():
 def check_node_installed():
     try:
         subprocess.run(["node", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except FileNotFoundError:
+    except FileNotFoundError or subprocess.CalledProcessError:
         print("Error: Node.js is not installed. Please install it from https://nodejs.org/")
         sys.exit(1)
 
@@ -36,7 +36,7 @@ def check_node_installed():
 def check_yarn_installed():
     try:
         subprocess.run(["yarn", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except FileNotFoundError:
+    except FileNotFoundError or subprocess.CalledProcessError:
         # Ask the user if they want to install Yarn
         print("Yarn is not installed.")
         answer = input("Would you like to install it now? (y/n) ")

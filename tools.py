@@ -263,27 +263,58 @@ class ArxivSearch:
 
     def retrieve_full_paper_text(self, query):
         pdf_text = str()
-        paper = next(arxiv.Client().results(arxiv.Search(id_list=[query])))
-        # Download the PDF to the PWD with a custom filename.
-        paper.download_pdf(filename="downloaded-paper.pdf")
-        # creating a pdf reader object
-        reader = PdfReader('downloaded-paper.pdf')
-        # Iterate over all the pages
-        for page_number, page in enumerate(reader.pages, start=1):
-            # Extract text from the page
-            try:
-                text = page.extract_text()
-            except Exception as e:
-                os.remove("downloaded-paper.pdf")
-                time.sleep(2.0)
-                return "EXTRACTION FAILED"
+        pdf_filename = "downloaded-paper.pdf"  # Temporary PDF filename
 
-            # Do something with the text (e.g., print it)
-            pdf_text += f"--- Page {page_number} ---"
-            pdf_text += text
-            pdf_text += "\n"
-        os.remove("downloaded-paper.pdf")
-        time.sleep(2.0)
+        try:
+            # Fetch the paper
+            try:
+                paper = next(arxiv.Client().results(arxiv.Search(id_list=[query])))
+            except StopIteration:
+                print(f"No results found for query: {query}")
+                return "NO RESULTS FOUND"
+            except arxiv.HTTPError as e:
+                print(f"Failed to fetch paper {query}: {e}")
+                return f"HTTP ERROR: {e}"
+            except Exception as e:
+                print(f"An unexpected error occurred while fetching paper: {e}")
+                return f"UNEXPECTED ERROR: {e}"
+
+            # Download the PDF file
+            try:
+                paper.download_pdf(filename=pdf_filename)
+            except Exception as e:
+                print(f"Failed to download PDF for paper {query}: {e}")
+                return f"DOWNLOAD ERROR: {e}"
+
+            # Read the PDF file and extract text
+            try:
+                reader = PdfReader(pdf_filename)
+                for page_number, page in enumerate(reader.pages, start=1):
+                    try:
+                        text = page.extract_text()
+                        pdf_text += f"--- Page {page_number} ---\n"
+                        pdf_text += text
+                        pdf_text += "\n"
+                    except Exception as e:
+                        print(f"Failed to extract text from page {page_number}: {e}")
+                        pdf_text += f"--- Page {page_number} ---\n"
+                        pdf_text += "EXTRACTION FAILED\n"
+            except Exception as e:
+                print(f"Failed to read PDF file: {e}")
+                return f"PDF READ ERROR: {e}"
+
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            return f"UNEXPECTED ERROR: {e}"
+        finally:
+            # Clean up temporary files
+            if os.path.exists(pdf_filename):
+                try:
+                    os.remove(pdf_filename)
+                except Exception as e:
+                    print(f"Failed to delete temporary file {pdf_filename}: {e}")
+            time.sleep(2.0)  # Avoid frequent requests
+
         return pdf_text
 
 """

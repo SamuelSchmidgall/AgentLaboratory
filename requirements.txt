@@ -28,11 +28,14 @@ exceptiongroup==1.2.2
 feedparser==6.0.11
 filelock==3.16.1
 flatbuffers==24.3.25
+flask==3.1.0
+flask-cors==5.0.0
 fonttools==4.55.0
 frozenlist==1.5.0
 fsspec==2024.9.0
 gast==0.6.0
 google-pasta==0.2.0
+gradio
 grpcio==1.68.0
 h11==0.14.0
 h5py==3.12.1
@@ -68,7 +71,7 @@ nest-asyncio==1.6.0
 networkx==3.2.1
 nltk==3.9.1
 numpy==2.0.2
-openai==1.55.1
+openai==1.55.3
 opt_einsum==3.4.0
 optree==0.13.1
 packaging==24.2
@@ -122,6 +125,8 @@ tifffile==2024.8.30
 tiktoken==0.8.0
 tokenizers==0.20.4
 torch==2.5.1
+torchaudio==2.5.1
+torchvision==0.20.1
 tqdm==4.67.1
 transformers==4.46.3
 typer==0.13.1

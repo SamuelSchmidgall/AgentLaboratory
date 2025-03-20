@@ -1,6 +1,7 @@
 from agents import *
 from copy import copy
 from common_imports import *
+from config import TASK_NOTE_LLM, CONFIG_HUMAN_IN_THE_LOOP, CONFIG_AGENT_MODELS
 from mlesolver import MLESolver
 from torch.backends.mkl import verbose
 
@@ -11,7 +12,7 @@ DEFAULT_LLM_BACKBONE = "o1-mini"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
+    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=None, notes=None, human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
         """
         Initialize laboratory workflow
         @param research_topic: (str) description of research idea to explore
@@ -21,12 +22,15 @@ class LaboratoryWorkflow:
         @param notes: (list) notes for agent to follow during tasks
         """
 
+        if notes is None:
+            notes = []
+
         self.notes = notes
         self.max_steps = max_steps
         self.compile_pdf = compile_pdf
         self.openai_api_key = openai_api_key
         self.research_topic = research_topic
-        self.model_backbone = agent_model_backbone
+        self.model_backbone = os.getenv('LLM_BACKEND') if os.getenv('LLM_BACKEND') is not None else DEFAULT_LLM_BACKBONE
         self.num_papers_lit_review = num_papers_lit_review
 
         self.print_cost = True
@@ -34,6 +38,18 @@ class LaboratoryWorkflow:
         self.review_ovrd_steps = 0 # review steps so far
         self.arxiv_paper_exp_time = 3
         self.reference_papers = list()
+
+
+        if agent_model_backbone is None:
+            agent_model_backbone = {
+                "literature review": self.model_backbone,
+                "plan formulation": self.model_backbone,
+                "data preparation": self.model_backbone,
+                "running experiments": self.model_backbone,
+                "results interpretation": self.model_backbone,
+                "report writing": self.model_backbone,
+                "report refinement": self.model_backbone,
+            }
 
         ##########################################
         ####### COMPUTE BUDGET PARAMETERS ########
@@ -61,9 +77,13 @@ class LaboratoryWorkflow:
                 for subtask in subtasks:
                     self.phase_models[subtask] = agent_model_backbone
         elif type(agent_model_backbone) == dict:
-            # todo: check if valid
-            self.phase_models = agent_model_backbone
-
+            # Load models for each phase if key exists otherwise use the default model
+            for phase, subtasks in self.phases:
+                for subtask in subtasks:
+                    if subtask in agent_model_backbone:
+                        self.phase_models[subtask] = agent_model_backbone[subtask]
+                    else:
+                        self.phase_models[subtask] = self.model_backbone
 
         self.human_in_loop_flag = human_in_loop_flag
 
@@ -147,7 +167,11 @@ class LaboratoryWorkflow:
                 if type(self.phase_models) == dict:
                     if subtask in self.phase_models:
                         self.set_model(self.phase_models[subtask])
-                    else: self.set_model(f"{DEFAULT_LLM_BACKBONE}")
+                    elif os.getenv('LLM_BACKEND') is not None:
+                        self.set_model(os.getenv('LLM_BACKEND'))
+                    else:
+                        print(f"Warning: Model for subtask {subtask} not found in phase_models dictionary or passed with argument. Using default model.")
+                        self.set_model(f"{DEFAULT_LLM_BACKBONE}")
                 if (subtask not in self.phase_status or not self.phase_status[subtask]) and subtask == "literature review":
                     repeat = True
                     while repeat: repeat = self.literature_review()
@@ -225,7 +249,9 @@ class LaboratoryWorkflow:
                 raise Exception("Model did not respond")
             response = response.lower().strip()[0]
             if response == "n":
-                if verbose: print("*"*40, "\n", "REVIEW COMPLETE", "\n", "*"*40)
+                if verbose:
+                    print("*"*40, "\n", "REVIEW COMPLETE", "\n", "*"*40)
+
                 return False
             elif response == "y":
                 self.set_agent_attr("reviewer_response", f"Provided are reviews from a set of three reviewers: {reviews}.")
@@ -243,7 +269,7 @@ class LaboratoryWorkflow:
         # instantiate mle-solver
         from papersolver import PaperSolver
         self.reference_papers = []
-        solver = PaperSolver(notes=report_notes, max_steps=self.papersolver_max_steps, plan=lab.phd.plan, exp_code=lab.phd.results_code, exp_results=lab.phd.exp_results, insights=lab.phd.interpretation, lit_review=lab.phd.lit_review, ref_papers=self.reference_papers, topic=research_topic, openai_api_key=self.openai_api_key, llm_str=self.model_backbone["report writing"], compile_pdf=compile_pdf)
+        solver = PaperSolver(notes=report_notes, max_steps=self.papersolver_max_steps, plan=lab.phd.plan, exp_code=lab.phd.results_code, exp_results=lab.phd.exp_results, insights=lab.phd.interpretation, lit_review=lab.phd.lit_review, ref_papers=self.reference_papers, topic=research_topic, openai_api_key=self.openai_api_key, llm_str=self.phase_models["report writing"], compile_pdf=compile_pdf)
         # run initialization for solver
         solver.initial_solve()
         # run solver for N mle optimization steps
@@ -307,7 +333,7 @@ class LaboratoryWorkflow:
         experiment_notes = [_note["note"] for _note in self.ml_engineer.notes if "running experiments" in _note["phases"]]
         experiment_notes = f"Notes for the task objective: {experiment_notes}\n" if len(experiment_notes) > 0 else ""
         # instantiate mle-solver
-        solver = MLESolver(dataset_code=self.ml_engineer.dataset_code, notes=experiment_notes, insights=self.ml_engineer.lit_review_sum, max_steps=self.mlesolver_max_steps, plan=self.ml_engineer.plan, openai_api_key=self.openai_api_key, llm_str=self.model_backbone["running experiments"])
+        solver = MLESolver(dataset_code=self.ml_engineer.dataset_code, notes=experiment_notes, insights=self.ml_engineer.lit_review_sum, max_steps=self.mlesolver_max_steps, plan=self.ml_engineer.plan, openai_api_key=self.openai_api_key, llm_str=self.phase_models["running experiments"])
         # run initialization for solver
         solver.initial_solve()
         # run solver for N mle optimization steps
@@ -545,6 +571,18 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        '--google-api-key',
+        type=str,
+        help='Provide the Google API key.'
+    )
+
+    parser.add_argument(
+        '--anthropic-api-key',
+        type=str,
+        help='Provide the Anthropic API key.'
+    )
+
+    parser.add_argument(
         '--load-existing',
         type=str,
         default="False",
@@ -611,126 +649,168 @@ def parse_arguments():
         help='Total number of paper-solver steps'
     )
 
+    parser.add_argument(
+        '--ollama-max-tokens',
+        type=str,
+        default="2048",
+        help='Total number of tokens to use for OLLAMA'
+    )
+
+    parser.add_argument(
+        '--task-note-llm-config-file',
+        type=str,
+        help='Provide path to the task note LLM config file.'
+    )
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
-    args = parse_arguments()
-
-    llm_backend = args.llm_backend
-    human_mode = args.copilot_mode.lower() == "true"
-    compile_pdf = args.compile_latex.lower() == "true"
-    load_existing = args.load_existing.lower() == "true"
     try:
-        num_papers_lit_review = int(args.num_papers_lit_review.lower())
-    except Exception:
-        raise Exception("args.num_papers_lit_review must be a valid integer!")
-    try:
-        papersolver_max_steps = int(args.papersolver_max_steps.lower())
-    except Exception:
-        raise Exception("args.papersolver_max_steps must be a valid integer!")
-    try:
-        mlesolver_max_steps = int(args.mlesolver_max_steps.lower())
-    except Exception:
-        raise Exception("args.papersolver_max_steps must be a valid integer!")
+        args = parse_arguments()
 
+        llm_backend = args.llm_backend
+        human_mode = args.copilot_mode.lower() == "true"
+        compile_pdf = args.compile_latex.lower() == "true"
+        load_existing = args.load_existing.lower() == "true"
+        try:
+            num_papers_lit_review = int(args.num_papers_lit_review.lower())
+        except Exception:
+            raise Exception("args.num_papers_lit_review must be a valid integer!")
+        try:
+            papersolver_max_steps = int(args.papersolver_max_steps.lower())
+        except Exception:
+            raise Exception("args.papersolver_max_steps must be a valid integer!")
+        try:
+            mlesolver_max_steps = int(args.mlesolver_max_steps.lower())
+        except Exception:
+            raise Exception("args.papersolver_max_steps must be a valid integer!")
 
-    api_key = os.getenv('OPENAI_API_KEY') or args.api_key
-    deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key
-    if args.api_key is not None and os.getenv('OPENAI_API_KEY') is None:
-        os.environ["OPENAI_API_KEY"] = args.api_key
-    if args.deepseek_api_key is not None and os.getenv('DEEPSEEK_API_KEY') is None:
-        os.environ["DEEPSEEK_API_KEY"] = args.deepseek_api_key
+        # If using ollama, set the max tokens
+        if args.api_key is not None:
+            if args.api_key == "ollama":
+                try:
+                    ollama_max_tokens = int(args.ollama_max_tokens.lower())
+                    os.environ["OLLAMA_MAX_TOKENS"] = str(ollama_max_tokens)
+                except Exception:
+                    raise Exception("args.ollama_max_tokens must be a valid integer!")
 
-    if not api_key and not deepseek_api_key:
-        raise ValueError("API key must be provided via --api-key / -deepseek-api-key or the OPENAI_API_KEY / DEEPSEEK_API_KEY environment variable.")
+        api_key = os.getenv('OPENAI_API_KEY') or args.api_key
+        deepseek_api_key = os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key
+        google_api_key = os.getenv('GOOGLE_API_KEY') or args.google_api_key
+        anthropic_api_key = os.getenv('ANTHROPIC_API_KEY') or args.anthropic_api_key
+        if args.api_key is not None and os.getenv('OPENAI_API_KEY') is None:
+            os.environ["OPENAI_API_KEY"] = args.api_key
+        if args.deepseek_api_key is not None and os.getenv('DEEPSEEK_API_KEY') is None:
+            os.environ["DEEPSEEK_API_KEY"] = args.deepseek_api_key
+        if args.google_api_key is not None and os.getenv('GOOGLE_API_KEY') is None:
+            os.environ["GOOGLE_API_KEY"] = args.google_api_key
+        if args.anthropic_api_key is not None and os.getenv('ANTHROPIC_API_KEY') is None:
+            os.environ["ANTHROPIC_API_KEY"] = args.anthropic_api_key
 
-    ##########################################################
-    # Research question that the agents are going to explore #
-    ##########################################################
-    if human_mode or args.research_topic is None:
-        research_topic = input("Please name an experiment idea for AgentLaboratory to perform: ")
-    else:
-        research_topic = args.research_topic
+        if not api_key and not deepseek_api_key and not google_api_key and not anthropic_api_key:
+            raise ValueError(
+                "API key must be provided via --api-key / -deepseek-api-key / --google-api-key / --anthropic-api-key argument "
+                "or the OPENAI_API_KEY / DEEPSEEK_API_KEY / GOOGLE_API_KEY / ANTHROPIC_API_KEY environment variable."
+            )
 
-    task_notes_LLM = [
-        {"phases": ["plan formulation"],
-         "note": f"You should come up with a plan for TWO experiments."},
+        # Store the backend LLM to use for the agents
+        if not llm_backend:
+            raise ValueError("Please provide a valid LLM backend to use for the agents.")
 
-        {"phases": ["plan formulation", "data preparation", "running experiments"],
-         "note": "Please use gpt-4o-mini for your experiments."},
+        os.environ["LLM_BACKEND"] = llm_backend
+        print(f"Using {llm_backend} as the backend LLM for the agents.")
 
-        {"phases": ["running experiments"],
-         "note": f'Use the following code to inference gpt-4o-mini: \nfrom openai import OpenAI\nos.environ["OPENAI_API_KEY"] = "{api_key}"\nclient = OpenAI()\ncompletion = client.chat.completions.create(\nmodel="gpt-4o-mini-2024-07-18", messages=messages)\nanswer = completion.choices[0].message.content\n'},
+        ##########################################################
+        # Research question that the agents are going to explore #
+        ##########################################################
+        if human_mode or args.research_topic is None:
+            research_topic = input("Please name an experiment idea for AgentLaboratory to perform: ")
+        else:
+            research_topic = args.research_topic
 
-        {"phases": ["running experiments"],
-         "note": f"You have access to only gpt-4o-mini using the OpenAI API, please use the following key {api_key} but do not use too many inferences. Do not use openai.ChatCompletion.create or any openai==0.28 commands. Instead use the provided inference code."},
+        if args.task_note_llm_config_file is not None:
+            try:
+                with open(args.task_note_llm_config_file, "r") as f:
+                    task_note_json = json.load(f)
 
-        {"phases": ["running experiments"],
-         "note": "I would recommend using a small dataset (approximately only 100 data points) to run experiments in order to save time. Do not use much more than this unless you have to or are running the final tests."},
+                # Verify that the JSON file is in the correct format
+                if not validate_task_note_config(task_note_json):
+                    raise ValueError("The task note LLM config file is not in the correct format.")
+            except Exception as e:
+                print(f"[Warning] Error loading the task note LLM config file: {e}")
+                # Use the default task note JSON
+                task_note_json = TASK_NOTE_LLM
+        else:
+            task_note_json = TASK_NOTE_LLM
 
-        {"phases": ["data preparation", "running experiments"],
-         "note": "You are running on a MacBook laptop. You can use 'mps' with PyTorch"},
-
-        {"phases": ["data preparation", "running experiments"],
-         "note": "Generate figures with very colorful and artistic design."},
-    ]
-
-    task_notes_LLM.append(
-        {"phases": ["literature review", "plan formulation", "data preparation", "running experiments", "results interpretation", "report writing", "report refinement"],
-        "note": f"You should always write in the following language to converse and to write the report {args.language}"},
-    )
-
-    ####################################################
-    ###  Stages where human input will be requested  ###
-    ####################################################
-    human_in_loop = {
-        "literature review":      human_mode,
-        "plan formulation":       human_mode,
-        "data preparation":       human_mode,
-        "running experiments":    human_mode,
-        "results interpretation": human_mode,
-        "report writing":         human_mode,
-        "report refinement":      human_mode,
-    }
-
-    ###################################################
-    ###  LLM Backend used for the different phases  ###
-    ###################################################
-    agent_models = {
-        "literature review":      llm_backend,
-        "plan formulation":       llm_backend,
-        "data preparation":       llm_backend,
-        "running experiments":    llm_backend,
-        "report writing":         llm_backend,
-        "results interpretation": llm_backend,
-        "paper refinement":       llm_backend,
-    }
-
-    if load_existing:
-        load_path = args.load_existing_path
-        if load_path is None:
-            raise ValueError("Please provide path to load existing state.")
-        with open(load_path, "rb") as f:
-            lab = pickle.load(f)
-    else:
-        lab = LaboratoryWorkflow(
+        task_notes_LLM = build_task_note(
+            task_note_json,
             research_topic=research_topic,
-            notes=task_notes_LLM,
-            agent_model_backbone=agent_models,
-            human_in_loop_flag=human_in_loop,
-            openai_api_key=api_key,
-            compile_pdf=compile_pdf,
-            num_papers_lit_review=num_papers_lit_review,
-            papersolver_max_steps=papersolver_max_steps,
-            mlesolver_max_steps=mlesolver_max_steps,
+            api_key=api_key,
+            deepseek_api_key=deepseek_api_key,
+            google_api_key=google_api_key,
+            anthropic_api_key=anthropic_api_key,
+            language=args.language,
+            llm_backend=llm_backend
         )
 
-    lab.perform_research()
+        ####################################################
+        ###  Stages where human input will be requested  ###
+        ####################################################
+        human_in_loop = {
+            "literature review":      human_mode,
+            "plan formulation":       human_mode,
+            "data preparation":       human_mode,
+            "running experiments":    human_mode,
+            "results interpretation": human_mode,
+            "report writing":         human_mode,
+            "report refinement":      human_mode,
+        }
+        for phase, mode in human_in_loop.items():
+            if phase not in CONFIG_HUMAN_IN_THE_LOOP:
+                continue
+            if type(CONFIG_HUMAN_IN_THE_LOOP[phase]) == bool:
+                human_in_loop[phase] = CONFIG_HUMAN_IN_THE_LOOP[phase]
 
+        ###################################################
+        ###  LLM Backend used for the different phases  ###
+        ###################################################
+        agent_models = {
+            "literature review":      llm_backend,
+            "plan formulation":       llm_backend,
+            "data preparation":       llm_backend,
+            "running experiments":    llm_backend,
+            "report writing":         llm_backend,
+            "results interpretation": llm_backend,
+            "report refinement":      llm_backend,
+        }
+        for phase, model in agent_models.items():
+            if CONFIG_AGENT_MODELS.get(phase) is None:
+                continue
+            if type(CONFIG_AGENT_MODELS[phase]) == str:
+                agent_models[phase] = CONFIG_AGENT_MODELS.get(phase)
 
+        if load_existing:
+            load_path = args.load_existing_path
+            if load_path is None:
+                raise ValueError("Please provide path to load existing state.")
+            with open(load_path, "rb") as f:
+                lab = pickle.load(f)
+        else:
+            lab = LaboratoryWorkflow(
+                research_topic=research_topic,
+                notes=task_notes_LLM,
+                agent_model_backbone=agent_models,
+                human_in_loop_flag=human_in_loop,
+                openai_api_key=api_key,
+                compile_pdf=compile_pdf,
+                num_papers_lit_review=num_papers_lit_review,
+                papersolver_max_steps=papersolver_max_steps,
+                mlesolver_max_steps=mlesolver_max_steps,
+            )
+        lab.perform_research()
+    except Exception as e:
+        input(f"An error occurred: {e}\nPress enter to exit.")
 
-
-
-
+    input("The research project has been completed. Press enter to exit.")

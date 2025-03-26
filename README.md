@@ -63,8 +63,13 @@ git clone git@github.com:SamuelSchmidgall/AgentLaboratory.git
 python -m venv venv_agent_lab
 ```
 - Now activate this environment:
+  - In UNIX based systems:
 ```bash
 source venv_agent_lab/bin/activate
+```
+  - In Windows Powershell, use the provided script:
+```bash
+.\venv_agent_lab\Scripts\Activate.ps1
 ```
 
 3. **Install required libraries**

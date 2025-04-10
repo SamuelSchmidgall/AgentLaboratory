@@ -724,5 +724,147 @@ class PhDStudentAgent(BaseAgent):
             f"arXiv ID: {_l['arxiv_id']}, Summary: {_l['summary']}"
             for _l in self.lit_review)
 
+class KnowledgeDomainAgent(BaseAgent):
+    def __init__(self, model="gpt-4o-mini", notes=None, max_steps=100, domain="general", openai_api_key=None):
+        super().__init__(model, notes, max_steps, openai_api_key)
+        self.domain = domain
+        self.phases = ["literature review", "plan formulation", "data preparation", "running experiments", "results interpretation"]
+        self.domain_knowledge = self.load_domain_knowledge(domain)
+        
+    def load_domain_knowledge(self, domain):
+        """
+        Load specialized domain knowledge based on the specified domain.
+        This could be expanded with more detailed prompts or even external knowledge bases.
+        """
+        domain_prompts = {
+            "biopharmaceutical": """
+                Focus on drug discovery, biomarkers, clinical trials, and regulatory considerations.
+                Key considerations:
+                - Drug discovery pipelines and high-throughput screening methodologies
+                - ADME properties (Absorption, Distribution, Metabolism, Excretion)
+                - Clinical trial design and analysis methods
+                - Regulatory requirements (FDA, EMA, etc.)
+                - Biomarker identification and validation
+                - Precision medicine approaches
+                - Pharmacokinetic/Pharmacodynamic (PK/PD) modeling
+                - Omics data analysis (genomics, proteomics, etc.)
+            """,
+            
+            "semiconductor": """
+                Focus on chip design, fabrication processes, materials science, and electronic design automation.
+                Key considerations:
+                - Lithography techniques and scaling challenges
+                - Logic design and verification methodologies
+                - Power, performance, and area (PPA) optimization
+                - Device physics and quantum effects
+                - Process variation and design for manufacturability
+                - Memory technologies (SRAM, DRAM, non-volatile memory)
+                - Chip packaging and thermal management
+                - Emerging technologies (3D integration, neuromorphic computing)
+            """,
+            
+            "optimization": """
+                Focus on mathematical programming, constraint satisfaction, metaheuristics, and operational research.
+                Key considerations:
+                - Linear, quadratic, and mixed-integer programming
+                - Convex and non-convex optimization
+                - Stochastic optimization methods
+                - Multi-objective optimization techniques
+                - Constraint handling and satisfaction problems
+                - Evolutionary algorithms and swarm intelligence
+                - Surrogate modeling and Bayesian optimization
+                - Operations research applications
+            """,
+            
+            "reinforcement_learning": """
+                Focus on Markov decision processes, policy gradients, Q-learning, and environment modeling.
+                Key considerations:
+                - Value-based vs. policy-based methods
+                - On-policy vs. off-policy learning
+                - Exploration-exploitation trade-offs
+                - Sample efficiency and stability
+                - Model-based vs. model-free approaches
+                - Multi-agent environments and coordination
+                - Hierarchical reinforcement learning
+                - Safe RL and constrained optimization
+            """,
+            
+            "computer_vision": """
+                Focus on image processing, convolutional neural networks, object detection, segmentation.
+                Key considerations:
+                - Feature extraction and representation learning
+                - Transfer learning and pre-trained models
+                - Object detection architectures (RCNN, YOLO, SSD)
+                - Semantic and instance segmentation
+                - 3D vision and depth estimation
+                - Video analysis and temporal modeling
+                - Few-shot and zero-shot learning
+                - Adversarial robustness and domain adaptation
+            """,
+            
+            "natural_language_processing": """
+                Focus on language modeling, sequence processing, transformers, and language understanding.
+                Key considerations:
+                - Word embeddings and contextual representations
+                - Transformer architectures and attention mechanisms
+                - Pre-training and fine-tuning methodologies
+                - Language understanding and generation tasks
+                - Multilingual and cross-lingual approaches
+                - Prompt engineering and in-context learning
+                - Efficient inference and model compression
+                - Evaluation metrics and benchmarks
+            """,
+            
+            "generative_ai": """
+                Focus on generative models, diffusion models, GANs, VAEs, and content generation.
+                Key considerations:
+                - Latent variable models and manifold learning
+                - Adversarial training and mode collapse challenges
+                - Diffusion probabilistic models
+                - Text-to-image and text-to-video generation
+                - Controllable generation and conditioning strategies
+                - Quality and diversity evaluation metrics
+                - Ethical considerations and safeguards
+                - Multimodal generation and alignment
+            """
+        }
+        return domain_prompts.get(domain, "No specific domain knowledge loaded. Operating with general ML knowledge.")
+        
+    def context(self, phase):
+        domain_context = f"\nDomain Expert Guidance for {self.domain}:\n{self.domain_knowledge}\n"
+        if phase == "literature review":
+            return domain_context
+        elif phase == "plan formulation":
+            return domain_context + f"\nCurrent Literature Review: {self.lit_review_sum}"
+        elif phase == "data preparation":
+            return domain_context + f"\nCurrent Literature Review: {self.lit_review_sum}\nPlan: {self.plan}"
+        elif phase == "results interpretation":
+            return domain_context + f"\nCurrent Literature Review: {self.lit_review_sum}\nCurrent Plan: {self.plan}\nCurrent Dataset code: {self.dataset_code}\nCurrent Experiment code: {self.results_code}\nCurrent Results: {self.exp_results}"
+        return domain_context
+    
+    def command_descriptions(self, phase):
+        if phase not in self.phases:
+            raise Exception(f"Invalid phase: {phase}")
+        return (
+            "You can provide domain-specific insights using the following command: ```DOMAIN_INSIGHT\ninsight here\n```\n where 'insight here' is the actual domain knowledge you want to share.\n"
+            "When performing a command, make sure to include the three ticks (```) at the top and bottom ```COMMAND\ntext\n``` where COMMAND is the specific command you want to run (e.g. DOMAIN_INSIGHT).\n"
+        )
+    
+    def phase_prompt(self, phase):
+        if phase not in self.phases:
+            raise Exception(f"Invalid phase: {phase}")
+        if phase == "literature review":
+            return f"You are a domain expert in {self.domain}. Your goal is to provide specialized knowledge to guide the literature review process. Suggest key concepts, seminal papers, and important authors in the field. Help identify research gaps and promising directions related to the research topic."
+        elif phase == "plan formulation":
+            return f"You are a domain expert in {self.domain}. Your goal is to provide specialized knowledge to guide the research plan. Suggest appropriate methodologies, experimental designs, and evaluation metrics specific to {self.domain}. Help identify potential challenges and ways to address them."
+        elif phase == "data preparation":
+            return f"You are a domain expert in {self.domain}. Your goal is to provide specialized knowledge for data preparation. Suggest domain-specific preprocessing techniques, feature engineering approaches, and data quality considerations relevant to {self.domain}."
+        elif phase == "running experiments":
+            return f"You are a domain expert in {self.domain}. Your goal is to provide specialized knowledge for experiment design and execution. Suggest domain-specific hyperparameters, model architectures, and training strategies appropriate for {self.domain}."
+        elif phase == "results interpretation":
+            return f"You are a domain expert in {self.domain}. Your goal is to provide specialized knowledge for interpreting results. Suggest domain-specific metrics, analysis techniques, and contextual interpretations relevant to {self.domain}."
+        
+    def role_description(self):
+        return f"a specialized domain expert in {self.domain} working at a top research institution."
 
 

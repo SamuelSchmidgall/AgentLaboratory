@@ -11,7 +11,7 @@ DEFAULT_LLM_BACKBONE = "o1-mini"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5):
+    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5,domain="general"):
         """
         Initialize laboratory workflow
         @param research_topic: (str) description of research idea to explore
@@ -19,6 +19,7 @@ class LaboratoryWorkflow:
         @param num_papers_lit_review: (int) number of papers to include in the lit review
         @param agent_model_backbone: (str or dict) model backbone to use for agents
         @param notes: (list) notes for agent to follow during tasks
+        @param domain: (str) specific knowledge domain for specialized research guidance
         """
 
         self.notes = notes
@@ -28,6 +29,7 @@ class LaboratoryWorkflow:
         self.research_topic = research_topic
         self.model_backbone = agent_model_backbone
         self.num_papers_lit_review = num_papers_lit_review
+        self.domain = domain
 
         self.print_cost = True
         self.review_override = True # should review be overridden?
@@ -85,6 +87,8 @@ class LaboratoryWorkflow:
         self.professor = ProfessorAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
         self.ml_engineer = MLEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
         self.sw_engineer = SWEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
+        self.domain_expert = KnowledgeDomainAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, domain=self.domain, openai_api_key=self.openai_api_key)
+
 
         # remove previous files
         remove_figures()
@@ -270,6 +274,20 @@ class LaboratoryWorkflow:
         """
         max_tries = self.max_steps
         dialogue = str()
+        # Get domain insights for results interpretation
+        if self.domain != "general":
+            self.domain_expert.dataset_code = self.phd.dataset_code
+            self.domain_expert.plan = self.phd.plan
+            self.domain_expert.lit_review_sum = self.phd.lit_review_sum
+            self.domain_expert.results_code = self.phd.results_code
+            self.domain_expert.exp_results = self.phd.exp_results
+            domain_resp = self.domain_expert.inference(self.research_topic, "results interpretation", step=0, temp=0.7)
+            if "```DOMAIN_INSIGHT" in domain_resp:
+                domain_insight = extract_prompt(domain_resp, "DOMAIN_INSIGHT")
+                dialogue = f"Domain Expert Insight for Results Interpretation: {domain_insight}\nThe above domain expert insights should guide your interpretation process."
+        
+
+
         # iterate until max num tries to complete task is exhausted
         for _i in range(max_tries):
             resp = self.postdoc.inference(self.research_topic, "results interpretation", feedback=dialogue, step=_i)
@@ -281,6 +299,16 @@ class LaboratoryWorkflow:
                 if self.verbose: print("#"*40, "\n", "Postdoc Dialogue:", dialogue, "\n", "#"*40)
             if "```INTERPRETATION" in resp:
                 interpretation = extract_prompt(resp, "INTERPRETATION")
+                
+                # Get domain expert insights on the interpretation
+                if self.domain != "general":
+                    domain_resp = self.domain_expert.inference(self.research_topic, "results interpretation", 
+                                                            feedback=f"Interpretation: {interpretation}", 
+                                                            step=_i+1, temp=0.7)
+                    if "```DOMAIN_INSIGHT" in domain_resp:
+                        domain_insight = extract_prompt(domain_resp, "DOMAIN_INSIGHT")
+                        interpretation += f"\n\nDomain Expert Insights on Results Interpretation: {domain_insight}"
+
                 if self.human_in_loop_flag["results interpretation"]:
                     retry = self.human_in_loop("results interpretation", interpretation)
                     if retry: return retry
@@ -306,6 +334,17 @@ class LaboratoryWorkflow:
         # experiment notes
         experiment_notes = [_note["note"] for _note in self.ml_engineer.notes if "running experiments" in _note["phases"]]
         experiment_notes = f"Notes for the task objective: {experiment_notes}\n" if len(experiment_notes) > 0 else ""
+        
+        # Get domain insights for running experiments
+        if self.domain != "general":
+            self.domain_expert.dataset_code = self.ml_engineer.dataset_code
+            self.domain_expert.plan = self.ml_engineer.plan
+            self.domain_expert.lit_review_sum = self.ml_engineer.lit_review_sum
+            domain_resp = self.domain_expert.inference(self.research_topic, "running experiments", step=0, temp=0.7)
+            if "```DOMAIN_INSIGHT" in domain_resp:
+                domain_insight = extract_prompt(domain_resp, "DOMAIN_INSIGHT")
+                experiment_notes += f"\nDomain Expert Insights for Experimentation: {domain_insight}\n"
+        
         # instantiate mle-solver
         solver = MLESolver(dataset_code=self.ml_engineer.dataset_code, notes=experiment_notes, insights=self.ml_engineer.lit_review_sum, max_steps=self.mlesolver_max_steps, plan=self.ml_engineer.plan, openai_api_key=self.openai_api_key, llm_str=self.model_backbone["running experiments"])
         # run initialization for solver
@@ -319,6 +358,17 @@ class LaboratoryWorkflow:
         execute_code(code)
         score = solver.best_codes[0][1]
         exp_results = solver.best_codes[0][2]
+
+        # Get domain expert insights on the experiment results
+        if self.domain != "general":
+            domain_resp = self.domain_expert.inference(self.research_topic, "running experiments", 
+                                                    feedback=f"Experiment code: {code}\nExperiment results: {exp_results}", 
+                                                    step=1, temp=0.7)
+            if "```DOMAIN_INSIGHT" in domain_resp:
+                domain_insight = extract_prompt(domain_resp, "DOMAIN_INSIGHT")
+                exp_results += f"\n\nDomain Expert Insights on Experiment Results: {domain_insight}"
+        
+
         if self.verbose: print(f"Running experiments completed, reward function score: {score}")
         if self.human_in_loop_flag["running experiments"]:
             retry = self.human_in_loop("data preparation", code)
@@ -341,6 +391,18 @@ class LaboratoryWorkflow:
         swe_feedback = str()
         ml_command = str()
         hf_engine = HFDataSearch()
+
+        # Get domain insights before starting data preparation
+        domain_insight = ""
+        if self.domain != "general":
+            self.domain_expert.plan = self.phd.plan
+            self.domain_expert.lit_review_sum = self.phd.lit_review_sum
+            domain_resp = self.domain_expert.inference(self.research_topic, "data preparation", step=0, temp=0.7)
+            if "```DOMAIN_INSIGHT" in domain_resp:
+                domain_insight = extract_prompt(domain_resp, "DOMAIN_INSIGHT")
+                ml_dialogue = f"\nDomain Expert Insight: {domain_insight}\nThe above domain expert insights should guide your data preparation process."
+        
+
         # iterate until max num tries to complete task is exhausted
         for _i in range(max_tries):
             if ml_feedback != "":
@@ -361,6 +423,15 @@ class LaboratoryWorkflow:
                 if "[CODE EXECUTION ERROR]" in code_resp:
                     swe_feedback += "\nERROR: Final code had an error and could not be submitted! You must address and fix this error.\n"
                 else:
+                    # Get domain expert insights on the final data preparation code
+                    if self.domain != "general":
+                        domain_resp = self.domain_expert.inference(self.research_topic, "data preparation", 
+                                                                feedback=f"Final data preparation code: {final_code}\nCode execution result: {code_resp}", 
+                                                                step=_i+1, temp=0.7)
+                        if "```DOMAIN_INSIGHT" in domain_resp:
+                            domain_insight = extract_prompt(domain_resp, "DOMAIN_INSIGHT")
+                            swe_feedback += f"\nDomain Expert Insights on Data Preparation: {domain_insight}\n"
+                    
                     if self.human_in_loop_flag["data preparation"]:
                         retry = self.human_in_loop("data preparation", final_code)
                         if retry: return retry
@@ -447,6 +518,16 @@ class LaboratoryWorkflow:
         """
         arx_eng = ArxivSearch()
         max_tries = self.max_steps * 5 # lit review often requires extra steps
+        
+    # Get domain insights before starting the literature review
+        domain_insight = ""
+        if self.domain != "general":
+            domain_resp = self.domain_expert.inference(self.research_topic, "literature review", step=0, temp=0.7)
+            if "```DOMAIN_INSIGHT" in domain_resp:
+                domain_insight = extract_prompt(domain_resp, "DOMAIN_INSIGHT")
+                domain_insight = f"Domain Expert Insight: {domain_insight}\nThe above domain expert insights should guide your literature review process."
+        
+            
         # get initial response from PhD agent
         resp = self.phd.inference(self.research_topic, "literature review", step=0, temp=0.8)
         if self.verbose: print(resp, "\n~~~~~~~~~~~")
@@ -478,6 +559,17 @@ class LaboratoryWorkflow:
             if len(self.phd.lit_review) >= self.num_papers_lit_review:
                 # generate formal review
                 lit_review_sum = self.phd.format_review()
+                
+                # Get domain expert insights on the literature review
+                if self.domain != "general":
+                    self.domain_expert.lit_review_sum = lit_review_sum
+                    domain_resp = self.domain_expert.inference(self.research_topic, "literature review", 
+                                                            feedback=f"Literature review completed: {lit_review_sum}", 
+                                                            step=_i+1, temp=0.7)
+                    if "```DOMAIN_INSIGHT" in domain_resp:
+                        domain_insight = extract_prompt(domain_resp, "DOMAIN_INSIGHT")
+                        lit_review_sum += f"\n\nDomain Expert Insights on Literature Review: {domain_insight}"
+                
                 # if human in loop -> check if human is happy with the produced review
                 if self.human_in_loop_flag["literature review"]:
                     retry = self.human_in_loop("literature review", lit_review_sum)
@@ -610,7 +702,16 @@ def parse_arguments():
         default="5",
         help='Total number of paper-solver steps'
     )
-
+    
+    parser.add_argument(
+        '--domain',
+        type=str,
+        default="general",
+        choices=["general", "biopharmaceutical", "semiconductor", "optimization", 
+                 "reinforcement_learning", "computer_vision", "natural_language_processing", 
+                 "generative_ai"],
+        help='Specify the knowledge domain for specialized research guidance'
+    )
 
     return parser.parse_args()
 

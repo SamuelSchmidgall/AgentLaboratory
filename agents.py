@@ -3,6 +3,13 @@ from tools import *
 from inference import *
 
 
+try:
+    from mem0 import MemoryClient
+    MEM0_AVAILABLE = True
+except ImportError:
+    MEM0_AVAILABLE = False
+
+
 def extract_json_between_markers(llm_output):
     # Regular expression pattern to find JSON content between ```json and ```
     json_pattern = r"```json(.*?)```"
@@ -868,3 +875,293 @@ class KnowledgeDomainAgent(BaseAgent):
         return f"a specialized domain expert in {self.domain} working at a top research institution."
 
 
+class MemoryAgent:
+    """
+    Memory Agent class that integrates Mem0 to provide persistent memory across research sessions.
+    This enables personalized research experiences by remembering researcher preferences and insights.
+    """
+    
+    def __init__(self, researcher_id=None, mem0_api_key=None):
+        """
+        Initialize the Memory Agent with Mem0 integration.
+        
+        Args:
+            researcher_id (str): Unique identifier for the researcher
+            mem0_api_key (str): API key for Mem0 service
+        """
+        self.researcher_id = researcher_id
+        self.mem0_api_key = mem0_api_key or os.getenv("MEM0_API_KEY")
+        self.enabled = self._initialize_mem0()
+        self.research_context = {}
+        
+    def _initialize_mem0(self):
+        """
+        Initialize the Mem0 client if available.
+        
+        Returns:
+            bool: True if Mem0 is successfully initialized, False otherwise
+        """
+        if not MEM0_AVAILABLE:
+            print("Warning: Mem0 package not found. Install with 'pip install mem0ai' to enable memory features.")
+            return False
+            
+        if not self.mem0_api_key:
+            print("Warning: Mem0 API key not provided. Memory features will be disabled.")
+            return False
+            
+        if not self.researcher_id:
+            print("Warning: Researcher ID not provided. Memory features will be disabled.")
+            return False
+            
+        try:
+            self.client = MemoryClient(api_key=self.mem0_api_key)
+            print(f"Memory Agent initialized for researcher: {self.researcher_id}")
+            return True
+        except Exception as e:
+            print(f"Error initializing Mem0 client: {e}")
+            return False
+    
+    def store_research_context(self, research_topic, domain=None):
+        """
+        Store the initial research context.
+        
+        Args:
+            research_topic (str): The research topic being explored
+            domain (str): The domain of research (if applicable)
+        """
+        if not self.enabled:
+            return
+            
+        try:
+            messages = [
+                {"role": "user", "content": f"I'm researching {research_topic} in the domain of {domain or 'general ML'}."}
+            ]
+            
+            self.client.add(messages, user_id=self.researcher_id)
+            print(f"Research context stored for topic: {research_topic}")
+        except Exception as e:
+            print(f"Error storing research context: {e}")
+    
+    def store_literature_insights(self, papers):
+        """
+        Store insights from the literature review phase.
+        
+        Args:
+            papers (list): List of papers reviewed with summaries
+        """
+        if not self.enabled:
+            return
+            
+        try:
+            paper_summaries = "\n".join([f"Paper: {p['arxiv_id']}, Summary: {p['summary'][:300]}..." for p in papers])
+            messages = [
+                {"role": "user", "content": f"During my literature review, I found these papers relevant: {paper_summaries}"}
+            ]
+            
+            self.client.add(messages, user_id=self.researcher_id, 
+                            metadata={"phase": "literature_review"})
+            print(f"Literature insights stored: {len(papers)} papers")
+        except Exception as e:
+            print(f"Error storing literature insights: {e}")
+    
+    def store_research_plan(self, plan):
+        """
+        Store the research plan.
+        
+        Args:
+            plan (str): The formulated research plan
+        """
+        if not self.enabled:
+            return
+            
+        try:
+            # Extract key aspects of the plan for more efficient storage
+            plan_summary = plan[:1000] + "..." if len(plan) > 1000 else plan
+            
+            messages = [
+                {"role": "user", "content": f"My research plan involves: {plan_summary}"}
+            ]
+            
+            self.client.add(messages, user_id=self.researcher_id, 
+                            metadata={"phase": "plan_formulation"})
+            print("Research plan stored")
+        except Exception as e:
+            print(f"Error storing research plan: {e}")
+    
+    def store_dataset_preferences(self, dataset_code):
+        """
+        Store dataset preferences from the data preparation phase.
+        
+        Args:
+            dataset_code (str): The dataset preparation code
+        """
+        if not self.enabled:
+            return
+            
+        try:
+            # Extract dataset name from code
+            import re
+            dataset_names = re.findall(r'load_dataset\([\'"]([^\'"]+)[\'"]', dataset_code)
+            dataset_str = ", ".join(dataset_names) if dataset_names else "custom dataset"
+            
+            messages = [
+                {"role": "user", "content": f"I prefer working with the following datasets: {dataset_str}"}
+            ]
+            
+            self.client.add(messages, user_id=self.researcher_id, 
+                            metadata={"phase": "data_preparation"})
+            print(f"Dataset preferences stored: {dataset_str}")
+        except Exception as e:
+            print(f"Error storing dataset preferences: {e}")
+    
+    def store_experiment_results(self, results_code, results):
+        """
+        Store experiment results and code.
+        
+        Args:
+            results_code (str): The experiment code
+            results (str): The experiment results
+        """
+        if not self.enabled:
+            return
+            
+        try:
+            # Extract key metrics from results
+            import re
+            metrics = re.findall(r'(accuracy|precision|recall|f1|loss)[:\s=]+([0-9.]+)', results)
+            metrics_str = ", ".join([f"{m[0]}: {m[1]}" for m in metrics]) if metrics else "results recorded"
+            
+            messages = [
+                {"role": "user", "content": f"My experiment produced these results: {metrics_str}"}
+            ]
+            
+            self.client.add(messages, user_id=self.researcher_id, 
+                            metadata={"phase": "experimentation"})
+            print(f"Experiment results stored: {metrics_str}")
+        except Exception as e:
+            print(f"Error storing experiment results: {e}")
+    
+    def store_research_interpretation(self, interpretation):
+        """
+        Store the interpretation of research results.
+        
+        Args:
+            interpretation (str): The results interpretation
+        """
+        if not self.enabled:
+            return
+            
+        try:
+            # Extract key insights from interpretation
+            interpretation_summary = interpretation[:1000] + "..." if len(interpretation) > 1000 else interpretation
+            
+            messages = [
+                {"role": "user", "content": f"My interpretation of the results: {interpretation_summary}"}
+            ]
+            
+            self.client.add(messages, user_id=self.researcher_id, 
+                            metadata={"phase": "results_interpretation"})
+            print("Research interpretation stored")
+        except Exception as e:
+            print(f"Error storing research interpretation: {e}")
+    
+    def store_research_report(self, report):
+        """
+        Store the final research report.
+        
+        Args:
+            report (str): The research report
+        """
+        if not self.enabled:
+            return
+            
+        try:
+            # Extract title and abstract
+            import re
+            title_match = re.search(r'\\title{([^}]+)}', report)
+            abstract_match = re.search(r'\\begin{abstract}(.*?)\\end{abstract}', report, re.DOTALL)
+            
+            title = title_match.group(1) if title_match else "Research report"
+            abstract = abstract_match.group(1) if abstract_match else "No abstract available"
+            
+            messages = [
+                {"role": "user", "content": f"I completed a research paper titled '{title}' with abstract: {abstract}"}
+            ]
+            
+            self.client.add(messages, user_id=self.researcher_id, 
+                            metadata={"phase": "report_writing"})
+            print(f"Research report stored: {title}")
+        except Exception as e:
+            print(f"Error storing research report: {e}")
+    
+    def get_researcher_preferences(self):
+        """
+        Retrieve researcher preferences and past research insights.
+        
+        Returns:
+            str: Researcher preferences and past research context
+        """
+        if not self.enabled:
+            return "No researcher preferences available (Memory features disabled)"
+            
+        try:
+            query = "What are my research preferences, interests, and past research topics?"
+            memory = self.client.search(query, user_id=self.researcher_id)
+            
+            if not memory:
+                return "No previous research preferences found"
+                
+            return f"Researcher preferences and context: {memory}"
+        except Exception as e:
+            print(f"Error retrieving researcher preferences: {e}")
+            return "Error retrieving researcher preferences"
+    
+    def get_domain_knowledge(self, domain):
+        """
+        Retrieve domain-specific knowledge from past research.
+        
+        Args:
+            domain (str): The research domain
+            
+        Returns:
+            str: Domain-specific knowledge
+        """
+        if not self.enabled:
+            return ""
+            
+        try:
+            query = f"What do I know about {domain} research?"
+            memory = self.client.search(query, user_id=self.researcher_id)
+            
+            if not memory:
+                return ""
+                
+            return f"Previous knowledge in {domain}: {memory}"
+        except Exception as e:
+            print(f"Error retrieving domain knowledge: {e}")
+            return ""
+    
+    def search_related_research(self, topic):
+        """
+        Search for related past research on similar topics.
+        
+        Args:
+            topic (str): The research topic
+            
+        Returns:
+            str: Related past research
+        """
+        if not self.enabled:
+            return ""
+            
+        try:
+            query = f"Have I done any research related to {topic}?"
+            memory = self.client.search(query, user_id=self.researcher_id)
+            
+            if not memory:
+                return ""
+                
+            return f"Related past research: {memory}"
+        except Exception as e:
+            print(f"Error searching related research: {e}")
+            return ""

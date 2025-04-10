@@ -11,95 +11,141 @@ DEFAULT_LLM_BACKBONE = "o1-mini"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5,domain="general"):
-        """
-        Initialize laboratory workflow
-        @param research_topic: (str) description of research idea to explore
-        @param max_steps: (int) max number of steps for each phase, i.e. compute tolerance budget
-        @param num_papers_lit_review: (int) number of papers to include in the lit review
-        @param agent_model_backbone: (str or dict) model backbone to use for agents
-        @param notes: (list) notes for agent to follow during tasks
-        @param domain: (str) specific knowledge domain for specialized research guidance
-        """
+    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, 
+                    agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), 
+                    human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, 
+                    papersolver_max_steps=5, domain="general", researcher_id=None, mem0_api_key=None):
+            """
+            Initialize laboratory workflow
+            @param research_topic: (str) description of research idea to explore
+            @param openai_api_key: (str) API key for OpenAI models
+            @param max_steps: (int) max number of steps for each phase, i.e. compute tolerance budget
+            @param num_papers_lit_review: (int) number of papers to include in the lit review
+            @param agent_model_backbone: (str or dict) model backbone to use for agents
+            @param notes: (list) notes for agent to follow during tasks
+            @param human_in_loop_flag: (dict) flags for human interaction in different phases
+            @param compile_pdf: (bool) whether to compile latex into PDF
+            @param mlesolver_max_steps: (int) max steps for ML solver
+            @param papersolver_max_steps: (int) max steps for paper solver
+            @param domain: (str) research domain for domain-specific knowledge
+            @param researcher_id: (str) unique identifier for the researcher
+            @param mem0_api_key: (str) API key for Mem0 memory service
+            """
 
-        self.notes = notes
-        self.max_steps = max_steps
-        self.compile_pdf = compile_pdf
-        self.openai_api_key = openai_api_key
-        self.research_topic = research_topic
-        self.model_backbone = agent_model_backbone
-        self.num_papers_lit_review = num_papers_lit_review
-        self.domain = domain
+            self.notes = notes
+            self.max_steps = max_steps
+            self.compile_pdf = compile_pdf
+            self.openai_api_key = openai_api_key
+            self.research_topic = research_topic
+            self.model_backbone = agent_model_backbone
+            self.num_papers_lit_review = num_papers_lit_review
+            self.domain = domain
+            self.researcher_id = researcher_id
+            self.mem0_api_key = mem0_api_key
 
-        self.print_cost = True
-        self.review_override = True # should review be overridden?
-        self.review_ovrd_steps = 0 # review steps so far
-        self.arxiv_paper_exp_time = 3
-        self.reference_papers = list()
+            self.print_cost = True
+            self.review_override = True # should review be overridden?
+            self.review_ovrd_steps = 0 # review steps so far
+            self.arxiv_paper_exp_time = 3
+            self.reference_papers = list()
 
-        ##########################################
-        ####### COMPUTE BUDGET PARAMETERS ########
-        ##########################################
-        self.num_ref_papers = 1
-        self.review_total_steps = 0 # num steps to take if overridden
-        self.arxiv_num_summaries = 5
-        self.mlesolver_max_steps = mlesolver_max_steps
-        self.papersolver_max_steps = papersolver_max_steps
+            ##########################################
+            ####### COMPUTE BUDGET PARAMETERS ########
+            ##########################################
+            self.num_ref_papers = 1
+            self.review_total_steps = 0 # num steps to take if overridden
+            self.arxiv_num_summaries = 5
+            self.mlesolver_max_steps = mlesolver_max_steps
+            self.papersolver_max_steps = papersolver_max_steps
 
-        self.phases = [
-            ("literature review", ["literature review"]),
-            ("plan formulation", ["plan formulation"]),
-            ("experimentation", ["data preparation", "running experiments"]),
-            ("results interpretation", ["results interpretation", "report writing", "report refinement"]),
-        ]
-        self.phase_status = dict()
-        for phase, subtasks in self.phases:
-            for subtask in subtasks:
-                self.phase_status[subtask] = False
-
-        self.phase_models = dict()
-        if type(agent_model_backbone) == str:
+            self.phases = [
+                ("literature review", ["literature review"]),
+                ("plan formulation", ["plan formulation"]),
+                ("experimentation", ["data preparation", "running experiments"]),
+                ("results interpretation", ["results interpretation", "report writing", "report refinement"]),
+            ]
+            self.phase_status = dict()
             for phase, subtasks in self.phases:
                 for subtask in subtasks:
-                    self.phase_models[subtask] = agent_model_backbone
-        elif type(agent_model_backbone) == dict:
-            # todo: check if valid
-            self.phase_models = agent_model_backbone
+                    self.phase_status[subtask] = False
 
+            self.phase_models = dict()
+            if type(agent_model_backbone) == str:
+                for phase, subtasks in self.phases:
+                    for subtask in subtasks:
+                        self.phase_models[subtask] = agent_model_backbone
+            elif type(agent_model_backbone) == dict:
+                # todo: check if valid
+                self.phase_models = agent_model_backbone
 
-        self.human_in_loop_flag = human_in_loop_flag
+            self.human_in_loop_flag = human_in_loop_flag
 
-        self.statistics_per_phase = {
-            "literature review":      {"time": 0.0, "steps": 0.0,},
-            "plan formulation":       {"time": 0.0, "steps": 0.0,},
-            "data preparation":       {"time": 0.0, "steps": 0.0,},
-            "running experiments":    {"time": 0.0, "steps": 0.0,},
-            "results interpretation": {"time": 0.0, "steps": 0.0,},
-            "report writing":         {"time": 0.0, "steps": 0.0,},
-            "report refinement":      {"time": 0.0, "steps": 0.0,},
-        }
+            self.statistics_per_phase = {
+                "literature review":      {"time": 0.0, "steps": 0.0,},
+                "plan formulation":       {"time": 0.0, "steps": 0.0,},
+                "data preparation":       {"time": 0.0, "steps": 0.0,},
+                "running experiments":    {"time": 0.0, "steps": 0.0,},
+                "results interpretation": {"time": 0.0, "steps": 0.0,},
+                "report writing":         {"time": 0.0, "steps": 0.0,},
+                "report refinement":      {"time": 0.0, "steps": 0.0,},
+            }
 
-        self.save = True
-        self.verbose = True
-        self.reviewers = ReviewersAgent(model=self.model_backbone, notes=self.notes, openai_api_key=self.openai_api_key)
-        self.phd = PhDStudentAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
-        self.postdoc = PostdocAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
-        self.professor = ProfessorAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
-        self.ml_engineer = MLEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
-        self.sw_engineer = SWEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
-        self.domain_expert = KnowledgeDomainAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, domain=self.domain, openai_api_key=self.openai_api_key)
+            self.save = True
+            self.verbose = True
+            
+            # Initialize memory agent for personalized research experience
+            self.memory_agent = MemoryAgent(researcher_id=researcher_id, mem0_api_key=mem0_api_key)
+            
+            # Store initial research context
+            if self.memory_agent.enabled:
+                self.memory_agent.store_research_context(research_topic, domain)
+                
+                # Get researcher preferences for personalization
+                researcher_context = self.memory_agent.get_researcher_preferences()
+                domain_knowledge = self.memory_agent.get_domain_knowledge(domain)
+                related_research = self.memory_agent.search_related_research(research_topic)
+                
+                # Add memory context to notes if available
+                if researcher_context and "No previous" not in researcher_context:
+                    self.notes.append({
+                        "phases": ["literature review", "plan formulation", "data preparation", 
+                                "running experiments", "results interpretation", "report writing"],
+                        "note": f"Researcher Context: {researcher_context}"
+                    })
+                
+                if domain_knowledge:
+                    self.notes.append({
+                        "phases": ["literature review", "plan formulation"],
+                        "note": f"Previous Domain Knowledge: {domain_knowledge}"
+                    })
+                    
+                if related_research:
+                    self.notes.append({
+                        "phases": ["literature review", "plan formulation"],
+                        "note": f"Related Previous Research: {related_research}"
+                    })
+            
+            # Initialize agents
+            self.reviewers = ReviewersAgent(model=self.model_backbone, notes=self.notes, openai_api_key=self.openai_api_key)
+            self.phd = PhDStudentAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
+            self.postdoc = PostdocAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
+            self.professor = ProfessorAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
+            self.ml_engineer = MLEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
+            self.sw_engineer = SWEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
+            
+            # Initialize the domain knowledge agent
+            self.domain_expert = KnowledgeDomainAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, domain=self.domain, openai_api_key=self.openai_api_key)
 
-
-        # remove previous files
-        remove_figures()
-        remove_directory("research_dir")
-        # make src and research directory
-        if not os.path.exists("state_saves"):
-            os.mkdir(os.path.join(".", "state_saves"))
-        os.mkdir(os.path.join(".", "research_dir"))
-        os.mkdir(os.path.join("./research_dir", "src"))
-        os.mkdir(os.path.join("./research_dir", "tex"))
-
+            # remove previous files
+            remove_figures()
+            remove_directory("research_dir")
+            # make src and research directory
+            if not os.path.exists("state_saves"):
+                os.mkdir(os.path.join(".", "state_saves"))
+            os.mkdir(os.path.join(".", "research_dir"))
+            os.mkdir(os.path.join("./research_dir", "src"))
+            os.mkdir(os.path.join("./research_dir", "tex"))
+        
     def set_model(self, model):
         self.set_agent_attr("model", model)
         self.reviewers.model = model
@@ -256,6 +302,11 @@ class LaboratoryWorkflow:
         # get best report results
         report = "\n".join(solver.best_report[0][0])
         score = solver.best_report[0][1]
+
+           # Store research report in memory
+        if self.memory_agent.enabled:
+            self.memory_agent.store_research_report(report)
+            
         if self.verbose: print(f"Report writing completed, reward function score: {score}")
         if self.human_in_loop_flag["report writing"]:
             retry = self.human_in_loop("report writing", report)
@@ -299,7 +350,10 @@ class LaboratoryWorkflow:
                 if self.verbose: print("#"*40, "\n", "Postdoc Dialogue:", dialogue, "\n", "#"*40)
             if "```INTERPRETATION" in resp:
                 interpretation = extract_prompt(resp, "INTERPRETATION")
-                
+                # Store research interpretation in memory
+                if self.memory_agent.enabled:
+                    self.memory_agent.store_research_interpretation(interpretation)
+            
                 # Get domain expert insights on the interpretation
                 if self.domain != "general":
                     domain_resp = self.domain_expert.inference(self.research_topic, "results interpretation", 
@@ -358,6 +412,11 @@ class LaboratoryWorkflow:
         execute_code(code)
         score = solver.best_codes[0][1]
         exp_results = solver.best_codes[0][2]
+
+        # Store experiment results in memory
+        if self.memory_agent.enabled:
+            self.memory_agent.store_experiment_results(code, exp_results)
+        
 
         # Get domain expert insights on the experiment results
         if self.domain != "general":
@@ -423,6 +482,10 @@ class LaboratoryWorkflow:
                 if "[CODE EXECUTION ERROR]" in code_resp:
                     swe_feedback += "\nERROR: Final code had an error and could not be submitted! You must address and fix this error.\n"
                 else:
+                    # Store dataset preferences in memory
+                    if self.memory_agent.enabled:
+                        self.memory_agent.store_dataset_preferences(final_code)
+                    
                     # Get domain expert insights on the final data preparation code
                     if self.domain != "general":
                         domain_resp = self.domain_expert.inference(self.research_topic, "data preparation", 
@@ -492,6 +555,10 @@ class LaboratoryWorkflow:
 
             if "```PLAN" in resp:
                 plan = extract_prompt(resp, "PLAN")
+                # Store research plan in memory
+                if self.memory_agent.enabled:
+                    self.memory_agent.store_research_plan(plan)
+                
                 if self.human_in_loop_flag["plan formulation"]:
                     retry = self.human_in_loop("plan formulation", plan)
                     if retry: return retry
@@ -560,6 +627,10 @@ class LaboratoryWorkflow:
                 # generate formal review
                 lit_review_sum = self.phd.format_review()
                 
+            # Store literature insights in memory
+            if self.memory_agent.enabled:
+                self.memory_agent.store_literature_insights(self.phd.lit_review)
+            
                 # Get domain expert insights on the literature review
                 if self.domain != "general":
                     self.domain_expert.lit_review_sum = lit_review_sum
@@ -712,6 +783,19 @@ def parse_arguments():
                  "generative_ai"],
         help='Specify the knowledge domain for specialized research guidance'
     )
+    
+    # Add memory-related arguments
+    parser.add_argument(
+        '--mem0-api-key',
+        type=str,
+        help='API key for Mem0 memory service. Required to enable personalized research experience.'
+    )
+    
+    parser.add_argument(
+        '--researcher-id',
+        type=str,
+        help='Unique identifier for the researcher. Required to maintain persistent memory across research sessions.'
+    )
 
     return parser.parse_args()
 
@@ -723,6 +807,10 @@ if __name__ == "__main__":
     human_mode = args.copilot_mode.lower() == "true"
     compile_pdf = args.compile_latex.lower() == "true"
     load_existing = args.load_existing.lower() == "true"
+    domain = args.domain
+    researcher_id = args.researcher_id
+    mem0_api_key = args.mem0_api_key or os.getenv("MEM0_API_KEY")
+    
     try:
         num_papers_lit_review = int(args.num_papers_lit_review.lower())
     except Exception:
@@ -743,6 +831,8 @@ if __name__ == "__main__":
         os.environ["OPENAI_API_KEY"] = args.api_key
     if args.deepseek_api_key is not None and os.getenv('DEEPSEEK_API_KEY') is None:
         os.environ["DEEPSEEK_API_KEY"] = args.deepseek_api_key
+    if args.mem0_api_key is not None and os.getenv('MEM0_API_KEY') is None:
+        os.environ["MEM0_API_KEY"] = args.mem0_api_key
 
     if not api_key and not deepseek_api_key:
         raise ValueError("API key must be provided via --api-key / -deepseek-api-key or the OPENAI_API_KEY / DEEPSEEK_API_KEY environment variable.")
@@ -777,6 +867,22 @@ if __name__ == "__main__":
         {"phases": ["data preparation", "running experiments"],
          "note": "Generate figures with very colorful and artistic design."},
     ]
+
+    # Add memory-related note if memory features are enabled
+    if mem0_api_key and researcher_id:
+        task_notes_LLM.append(
+            {"phases": ["literature review", "plan formulation", "data preparation", "running experiments", 
+                      "results interpretation", "report writing", "report refinement"],
+            "note": f"This research is being conducted for researcher ID: {researcher_id}. Previous research preferences and results will be automatically retrieved to personalize this research session."}
+        )
+
+    # Add domain-specific note if a domain is specified
+    if domain != "general":
+        task_notes_LLM.append(
+            {"phases": ["literature review", "plan formulation", "data preparation", "running experiments", 
+                      "results interpretation", "report writing", "report refinement"],
+            "note": f"This research is in the {domain} domain. Make sure to leverage domain-specific knowledge, techniques, and evaluation metrics."}
+        )
 
     task_notes_LLM.append(
         {"phases": ["literature review", "plan formulation", "data preparation", "running experiments", "results interpretation", "report writing", "report refinement"],
@@ -826,12 +932,9 @@ if __name__ == "__main__":
             num_papers_lit_review=num_papers_lit_review,
             papersolver_max_steps=papersolver_max_steps,
             mlesolver_max_steps=mlesolver_max_steps,
+            domain=domain,
+            researcher_id=researcher_id,
+            mem0_api_key=mem0_api_key,
         )
 
     lab.perform_research()
-
-
-
-
-
-

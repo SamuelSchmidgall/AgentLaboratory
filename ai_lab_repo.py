@@ -705,6 +705,7 @@ def parse_yaml(yaml_file_loc):
     else: parser.construct_agentRxiv = False
     if 'agentrxiv-papers' in agentlab_data: parser.agentrxiv_papers = agentlab_data["agentrxiv-papers"]
     else:  parser.agentrxiv_papers = 5
+    if 'openrouter-api-key' in agentlab_data: parser.openrouter_api_key = agentlab_data['openrouter-api-key']
 
     if 'lab-index' in agentlab_data: parser.lab_index = agentlab_data["lab-index"]
     else: parser.lab_index = 0
@@ -741,6 +742,9 @@ if __name__ == "__main__":
 
     api_key = (os.getenv('OPENAI_API_KEY') or args.api_key) if (hasattr(args, 'api_key') or os.getenv('OPENAI_API_KEY')) else None
     deepseek_api_key = (os.getenv('DEEPSEEK_API_KEY') or args.deepseek_api_key) if (hasattr(args, 'deepseek_api_key') or os.getenv('DEEPSEEK_API_KEY')) else None
+    openrouter_api_key = (os.getenv('OPENROUTER_API_KEY') or getattr(args, 'openrouter_api_key', None))
+    if openrouter_api_key is not None and os.getenv('OPENROUTER_API_KEY') is None:
+        os.environ['OPENROUTER_API_KEY'] = openrouter_api_key
     if api_key is not None and os.getenv('OPENAI_API_KEY') is None: os.environ["OPENAI_API_KEY"] = args.api_key
     if deepseek_api_key is not None and os.getenv('DEEPSEEK_API_KEY') is None: os.environ["DEEPSEEK_API_KEY"] = args.deepseek_api_key
 

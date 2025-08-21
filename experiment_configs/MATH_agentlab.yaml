@@ -7,10 +7,12 @@ research-topic: "Your goal is to design reasoning and prompt engineering techniq
 # Here you can put your OpenAI API key--if you don't have one or OpenAI doesn't work for you, you can also instead use `deepseek-api-key`
 api-key: "OPENAI-API-KEY-HERE"
 # or deepseek-api-key: "DEEPSEEK-API-KEY-HERE"
+openrouter-api-key: "OPENROUTER_API_KEY"
+
 # Agent Laboratory backend
-llm-backend: "o3-mini"
+llm-backend: "openrouter/deepseek/deepseek-chat-v3-0324:free"
 # Literature review backend
-lit-review-backend: "o3-mini"
+lit-review-backend: "openrouter/deepseek/deepseek-chat-v3-0324:free"
 
 # Base language
 language: "English"

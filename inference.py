@@ -3,6 +3,8 @@ import time, tiktoken
 from openai import OpenAI
 import os, anthropic, json
 import google.generativeai as genai
+import requests  # For completeness, in case it's used elsewhere
+from openrouter_inference import query_openrouter_model  # Import the new function
 
 TOKENS_IN = dict()
 TOKENS_OUT = dict()
@@ -34,6 +36,7 @@ def curr_cost_est():
 
 def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_api_key=None,  anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
     preloaded_api = os.getenv('OPENAI_API_KEY')
+    preloaded_openrouter_api = os.getenv('OPENROUTER_API_KEY')
     if openai_api_key is None and preloaded_api is not None:
         openai_api_key = preloaded_api
     if openai_api_key is None and anthropic_api_key is None:
@@ -47,6 +50,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_ap
         os.environ["GEMINI_API_KEY"] = gemini_api_key
     for _ in range(tries):
         try:
+            answer = None  # ensure answer is always defined
             if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
                 model_str = "gpt-4o-mini"
                 messages = [
@@ -186,24 +190,40 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_ap
                     completion = client.chat.completions.create(
                         model="o1-preview", messages=messages)
                 answer = completion.choices[0].message.content
+            elif model_str.startswith("openrouter/"):
+                openrouter_model = model_str[len("openrouter/"):]  # Remove the prefix
+                answer = query_openrouter_model(
+                    model_str=openrouter_model,
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    openrouter_api_key=preloaded_openrouter_api,
+                    temp=temp
+                )
 
             try:
-                if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1", "o3-mini"]:
-                    encoding = tiktoken.encoding_for_model("gpt-4o")
-                elif model_str in ["deepseek-chat"]:
-                    encoding = tiktoken.encoding_for_model("cl100k_base")
+                # Use a default tokenizer for unknown or OpenRouter models
+                if (
+                    model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1", "o3-mini"]
+                    or model_str.startswith("openrouter/")
+                    or "deepseek" in model_str
+                ):
+                    encoding = tiktoken.get_encoding("cl100k_base")
                 else:
                     encoding = tiktoken.encoding_for_model(model_str)
                 if model_str not in TOKENS_IN:
                     TOKENS_IN[model_str] = 0
                     TOKENS_OUT[model_str] = 0
                 TOKENS_IN[model_str] += len(encoding.encode(system_prompt + prompt))
-                TOKENS_OUT[model_str] += len(encoding.encode(answer))
+                if answer is not None:
+                    TOKENS_OUT[model_str] += len(encoding.encode(answer))
                 if print_cost:
                     print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
             except Exception as e:
                 if print_cost: print(f"Cost approximation has an error? {e}")
-            return answer
+            if answer is not None:
+                return answer
+            else:
+                raise Exception("No answer returned from model.")
         except Exception as e:
             print("Inference Exception:", e)
             time.sleep(timeout)

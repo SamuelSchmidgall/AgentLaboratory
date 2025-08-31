@@ -1,0 +1,74 @@
+:root {
+  --bg: #0b0d10;
+  --panel: #12161b;
+  --text: #e8eef5;
+  --muted: #9fb3c8;
+  --brand: #79b8ff;
+  --accent: #7ee787;
+  --danger: #ff6b6b;
+  --border: #1e2a36;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: linear-gradient(180deg, #0b0d10, #0d1014);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.container { max-width: 1000px; margin: 0 auto; padding: 24px; }
+
+.site-header {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(11,13,16,0.8); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.header-grid { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { color: var(--brand); font-weight: 700; text-decoration: none; letter-spacing: 0.3px; }
+.nav a { color: var(--text); text-decoration: none; margin-left: 16px; opacity: 0.85; }
+.nav a:hover { opacity: 1; }
+
+.site-footer { border-top: 1px solid var(--border); color: var(--muted); }
+.hero h1 { margin: 0 0 8px; }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", monospace; }
+
+.searchbar { display: flex; gap: 8px; margin: 16px 0; }
+.searchbar input[type="search"] {
+  flex: 1; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 12px; border-radius: 8px;
+}
+.searchbar button, .btn {
+  background: var(--brand); color: #06101e; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600;
+}
+.btn:hover { filter: brightness(1.1); }
+.btn-secondary { background: #2b3340; color: var(--text); }
+.btn.tiny { padding: 6px 10px; font-size: 13px; }
+
+.actions { display: flex; gap: 12px; margin: 10px 0 24px; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.form label { display: block; margin: 0 0 6px; }
+.form input[type="file"] { display: block; margin-bottom: 12px; }
+
+.table {
+  width: 100%; border-collapse: collapse; border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden; background: var(--panel);
+}
+.table th, .table td { padding: 12px; border-bottom: 1px solid var(--border); }
+.table thead th { background: #0f1419; text-align: left; color: var(--muted); font-weight: 600; }
+
+.flash-list { list-style: none; padding: 0; margin: 12px 0; }
+.flash { padding: 10px 12px; border-radius: 8px; background: #1b2430; border: 1px solid var(--border); }
+.flash.error { background: #2a1212; border-color: #3a1a1a; color: #ffd9d9; }
+
+.pdf-frame { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); }
+.pdf-frame iframe { width: 100%; height: 75vh; border: 0; display: block; }

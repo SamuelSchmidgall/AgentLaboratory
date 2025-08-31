@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Semantic Search</h1>
+
+<form class="searchbar" action="{{ url_for('search') }}" method="get">
+  <input type="search" name="q" value="{{ query or '' }}" placeholder="Try 'transformers for math reasoning'…" required>
+  <input type="hidden" name="k" value="10">
+  <button type="submit">Search</button>
+</form>
+
+<div id="live-results" data-endpoint="{{ url_for('api_search') }}"></div>
+
+{% if query %}
+  {% if results %}
+    <h2 class="muted">Results for “{{ query }}”</h2>
+    <table class="table">
+      <thead><tr><th>File</th><th>Score</th><th></th></tr></thead>
+      <tbody>
+      {% for p,score in results %}
+        <tr>
+          <td>{{ p.filename }}</td>
+          <td class="mono">{{ '%.4f'|format(score) }}</td>
+          <td><a class="btn tiny" href="{{ url_for('view_pdf', paper_id=p.id) }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No results yet. Try another query.</p>
+  {% endif %}
+{% endif %}
+{% endblock %}

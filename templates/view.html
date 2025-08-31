@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ paper.filename }}</h1>
+<div class="pdf-frame">
+  <iframe src="{{ pdf_url }}" title="PDF: {{ paper.filename }}" loading="lazy"></iframe>
+</div>
+<div class="actions">
+  <a class="btn" href="{{ pdf_url }}">Download</a>
+  <a class="btn btn-secondary" href="{{ url_for('search') }}">Back to Search</a>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Upload a PDF</h1>
+<form class="card form" method="post" enctype="multipart/form-data">
+  <label for="pdf">Choose PDF</label>
+  <input id="pdf" type="file" name="pdf" accept="application/pdf" required>
+  <button type="submit">Upload</button>
+</form>
+<p class="muted">We’ll extract text locally and cache embeddings for fast semantic search.</p>
+{% endblock %}

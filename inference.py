@@ -1,214 +1,199 @@
-import openai
-import time, tiktoken
-from openai import OpenAI
-import os, anthropic, json
+# inference.py
+import os
+import time
+import json
+import tiktoken
+import anthropic
 import google.generativeai as genai
+from openai import OpenAI
 
 TOKENS_IN = dict()
 TOKENS_OUT = dict()
 
-encoding = tiktoken.get_encoding("cl100k_base")
+def _encoding_for(model_id: str):
+    try:
+        # Known OpenAI families
+        if any(model_id.startswith(p) for p in ["o1", "o3", "gpt-4", "gpt-5", "gpt-4o"]):
+            return tiktoken.encoding_for_model("gpt-4o")
+        return tiktoken.encoding_for_model(model_id)
+    except Exception:
+        return tiktoken.get_encoding("cl100k_base")
 
 def curr_cost_est():
+    # Keep as an approximation; unknown models won't be counted
     costmap_in = {
-        "gpt-4o": 2.50 / 1000000,
-        "gpt-4o-mini": 0.150 / 1000000,
-        "o1-preview": 15.00 / 1000000,
-        "o1-mini": 3.00 / 1000000,
-        "claude-3-5-sonnet": 3.00 / 1000000,
-        "deepseek-chat": 1.00 / 1000000,
-        "o1": 15.00 / 1000000,
-        "o3-mini": 1.10 / 1000000,
+        "gpt-4o": 2.50 / 1_000_000,
+        "gpt-4o-mini": 0.150 / 1_000_000,
+        "o1-preview": 15.00 / 1_000_000,
+        "o1-mini": 3.00 / 1_000_000,
+        "claude-3-5-sonnet": 3.00 / 1_000_000,
+        "deepseek-chat": 1.00 / 1_000_000,
+        "o1": 15.00 / 1_000_000,
+        "o3-mini": 1.10 / 1_000_000,
+        # Extend as needed
     }
     costmap_out = {
-        "gpt-4o": 10.00/ 1000000,
-        "gpt-4o-mini": 0.6 / 1000000,
-        "o1-preview": 60.00 / 1000000,
-        "o1-mini": 12.00 / 1000000,
-        "claude-3-5-sonnet": 12.00 / 1000000,
-        "deepseek-chat": 5.00 / 1000000,
-        "o1": 60.00 / 1000000,
-        "o3-mini": 4.40 / 1000000,
+        "gpt-4o": 10.00 / 1_000_000,
+        "gpt-4o-mini": 0.6 / 1_000_000,
+        "o1-preview": 60.00 / 1_000_000,
+        "o1-mini": 12.00 / 1_000_000,
+        "claude-3-5-sonnet": 12.00 / 1_000_000,
+        "deepseek-chat": 5.00 / 1_000_000,
+        "o1": 60.00 / 1_000_000,
+        "o3-mini": 4.40 / 1_000_000,
     }
-    return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
+    total = 0.0
+    for k, v in TOKENS_IN.items():
+        if k in costmap_in:
+            total += costmap_in[k] * v
+    for k, v in TOKENS_OUT.items():
+        if k in costmap_out:
+            total += costmap_out[k] * v
+    return total
 
-def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_api_key=None,  anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
-    preloaded_api = os.getenv('OPENAI_API_KEY')
-    if openai_api_key is None and preloaded_api is not None:
-        openai_api_key = preloaded_api
-    if openai_api_key is None and anthropic_api_key is None:
-        raise Exception("No API key provided in query_model function")
-    if openai_api_key is not None:
-        openai.api_key = openai_api_key
+
+def _track_tokens(model_str, system_prompt, prompt, answer, print_cost=True):
+    try:
+        enc = _encoding_for(model_str)
+        TOKENS_IN.setdefault(model_str, 0)
+        TOKENS_OUT.setdefault(model_str, 0)
+        TOKENS_IN[model_str] += len(enc.encode((system_prompt or "") + (prompt or "")))
+        TOKENS_OUT[model_str] += len(enc.encode(answer or ""))
+        if print_cost:
+            print(f"Current experiment cost = ${curr_cost_est()}, **Approximate only**")
+    except Exception as e:
+        if print_cost:
+            print(f"Cost approximation error: {e}")
+
+
+def query_model(
+    model_str,
+    prompt,
+    system_prompt,
+    openai_api_key=None,
+    gemini_api_key=None,
+    anthropic_api_key=None,
+    tries=5,
+    timeout=5.0,
+    temp=None,
+    print_cost=True,
+    version="1.5"
+):
+    """
+    Generic model router:
+    - OpenAI: any 'gpt-*' (incl. gpt-5*) and 'o*' models
+    - Anthropic: any 'claude-*' model id
+    - Google: any 'gemini-*' model id (incl. gemini-2.5-*)
+    - DeepSeek (explicit): 'deepseek-chat'
+    """
+    # Resolve API keys from env when necessary
+    if openai_api_key is None and os.getenv("OPENAI_API_KEY"):
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+    if anthropic_api_key is None and os.getenv("ANTHROPIC_API_KEY"):
+        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+    if gemini_api_key is None and os.getenv("GEMINI_API_KEY"):
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+
+    if openai_api_key:
         os.environ["OPENAI_API_KEY"] = openai_api_key
-    if anthropic_api_key is not None:
+    if anthropic_api_key:
         os.environ["ANTHROPIC_API_KEY"] = anthropic_api_key
-    if gemini_api_key is not None:
+    if gemini_api_key:
         os.environ["GEMINI_API_KEY"] = gemini_api_key
+
+    normalized = (model_str or "").strip()
+
     for _ in range(tries):
         try:
-            if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
-                model_str = "gpt-4o-mini"
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}]
-                if version == "0.28":
-                    if temp is None:
-                        completion = openai.ChatCompletion.create(
-                            model=f"{model_str}",  # engine = "deployment_name".
-                            messages=messages
-                        )
-                    else:
-                        completion = openai.ChatCompletion.create(
-                            model=f"{model_str}",  # engine = "deployment_name".
-                            messages=messages, temperature=temp
-                        )
+            # -------------------------
+            # OpenAI families (GPT-4*, GPT-5*, o1/o3 etc.)
+            # -------------------------
+            if normalized.startswith("gpt-") or normalized.startswith("o1") or normalized.startswith("o3"):
+                client = OpenAI()
+                # Some o* models may prefer single 'user' message; keep conservative merge where needed
+                if normalized.startswith("o1") or normalized.startswith("o3"):
+                    messages = [{"role": "user", "content": (system_prompt or "") + (prompt or "")}]
                 else:
-                    client = OpenAI()
-                    if temp is None:
-                        completion = client.chat.completions.create(
-                            model="gpt-4o-mini-2024-07-18", messages=messages, )
-                    else:
-                        completion = client.chat.completions.create(
-                            model="gpt-4o-mini-2024-07-18", messages=messages, temperature=temp)
+                    messages = [
+                        {"role": "system", "content": system_prompt or ""},
+                        {"role": "user", "content": prompt or ""}
+                    ]
+                kwargs = {"model": normalized, "messages": messages}
+                if temp is not None:
+                    kwargs["temperature"] = temp
+                completion = client.chat.completions.create(**kwargs)
                 answer = completion.choices[0].message.content
 
-            elif model_str == "gemini-2.0-pro":
-                genai.configure(api_key=gemini_api_key)
-                model = genai.GenerativeModel(model_name="gemini-2.0-pro-exp-02-05", system_instruction=system_prompt)
-                answer = model.generate_content(prompt).text
-            elif model_str == "gemini-1.5-pro":
-                genai.configure(api_key=gemini_api_key)
-                model = genai.GenerativeModel(model_name="gemini-1.5-pro", system_instruction=system_prompt)
-                answer = model.generate_content(prompt).text
-            elif model_str == "o3-mini":
-                model_str = "o3-mini"
-                messages = [
-                    {"role": "user", "content": system_prompt + prompt}]
-                if version == "0.28":
-                    completion = openai.ChatCompletion.create(
-                        model=f"{model_str}",  messages=messages)
-                else:
-                    client = OpenAI()
-                    completion = client.chat.completions.create(
-                        model="o3-mini-2025-01-31", messages=messages)
-                answer = completion.choices[0].message.content
-
-            elif model_str == "claude-3.5-sonnet":
-                client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+            # -------------------------
+            # Anthropic Claude (any)
+            # -------------------------
+            elif normalized.startswith("claude-"):
+                client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
                 message = client.messages.create(
-                    model="claude-3-5-sonnet-latest",
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": prompt}])
-                answer = json.loads(message.to_json())["content"][0]["text"]
-            elif model_str == "gpt4o" or model_str == "gpt-4o":
-                model_str = "gpt-4o"
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}]
-                if version == "0.28":
-                    if temp is None:
-                        completion = openai.ChatCompletion.create(
-                            model=f"{model_str}",  # engine = "deployment_name".
-                            messages=messages
-                        )
-                    else:
-                        completion = openai.ChatCompletion.create(
-                            model=f"{model_str}",  # engine = "deployment_name".
-                            messages=messages, temperature=temp)
+                    model=normalized,
+                    system=system_prompt or "",
+                    messages=[{"role": "user", "content": prompt or ""}],
+                    temperature=temp if temp is not None else 0.0,
+                )
+                # Content is a list of content blocks—coalesce to text
+                answer = ""
+                try:
+                    for blk in message.content:
+                        if getattr(blk, "type", "") == "text":
+                            answer += blk.text
+                        elif isinstance(blk, dict) and blk.get("type") == "text":
+                            answer += blk.get("text", "")
+                except Exception:
+                    answer = json.loads(message.to_json())["content"][0]["text"]
+
+            # -------------------------
+            # Google Gemini (incl. 2.5)
+            # -------------------------
+            elif normalized.startswith("gemini-"):
+                genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+                model = genai.GenerativeModel(model_name=normalized, system_instruction=system_prompt or "")
+                if temp is not None:
+                    cfg = genai.types.GenerationConfig(temperature=temp)
+                    answer = model.generate_content(prompt or "", generation_config=cfg).text
                 else:
-                    client = OpenAI()
-                    if temp is None:
-                        completion = client.chat.completions.create(
-                            model="gpt-4o-2024-08-06", messages=messages, )
-                    else:
-                        completion = client.chat.completions.create(
-                            model="gpt-4o-2024-08-06", messages=messages, temperature=temp)
-                answer = completion.choices[0].message.content
-            elif model_str == "deepseek-chat":
-                model_str = "deepseek-chat"
+                    answer = model.generate_content(prompt or "").text
+
+            # -------------------------
+            # DeepSeek explicit
+            # -------------------------
+            elif normalized == "deepseek-chat":
+                deepseek_client = OpenAI(
+                    api_key=os.getenv("DEEPSEEK_API_KEY"),
+                    base_url="https://api.deepseek.com/v1"
+                )
                 messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}]
-                if version == "0.28":
-                    raise Exception("Please upgrade your OpenAI version to use DeepSeek client")
-                else:
-                    deepseek_client = OpenAI(
-                        api_key=os.getenv('DEEPSEEK_API_KEY'),
-                        base_url="https://api.deepseek.com/v1"
-                    )
-                    if temp is None:
-                        completion = deepseek_client.chat.completions.create(
-                            model="deepseek-chat",
-                            messages=messages)
-                    else:
-                        completion = deepseek_client.chat.completions.create(
-                            model="deepseek-chat",
-                            messages=messages,
-                            temperature=temp)
-                answer = completion.choices[0].message.content
-            elif model_str == "o1-mini":
-                model_str = "o1-mini"
-                messages = [
-                    {"role": "user", "content": system_prompt + prompt}]
-                if version == "0.28":
-                    completion = openai.ChatCompletion.create(
-                        model=f"{model_str}",  # engine = "deployment_name".
-                        messages=messages)
-                else:
-                    client = OpenAI()
-                    completion = client.chat.completions.create(
-                        model="o1-mini-2024-09-12", messages=messages)
-                answer = completion.choices[0].message.content
-            elif model_str == "o1":
-                model_str = "o1"
-                messages = [
-                    {"role": "user", "content": system_prompt + prompt}]
-                if version == "0.28":
-                    completion = openai.ChatCompletion.create(
-                        model="o1-2024-12-17",  # engine = "deployment_name".
-                        messages=messages)
-                else:
-                    client = OpenAI()
-                    completion = client.chat.completions.create(
-                        model="o1-2024-12-17", messages=messages)
-                answer = completion.choices[0].message.content
-            elif model_str == "o1-preview":
-                model_str = "o1-preview"
-                messages = [
-                    {"role": "user", "content": system_prompt + prompt}]
-                if version == "0.28":
-                    completion = openai.ChatCompletion.create(
-                        model=f"{model_str}",  # engine = "deployment_name".
-                        messages=messages)
-                else:
-                    client = OpenAI()
-                    completion = client.chat.completions.create(
-                        model="o1-preview", messages=messages)
+                    {"role": "system", "content": system_prompt or ""},
+                    {"role": "user", "content": prompt or ""}
+                ]
+                kwargs = {"model": "deepseek-chat", "messages": messages}
+                if temp is not None:
+                    kwargs["temperature"] = temp
+                completion = deepseek_client.chat.completions.create(**kwargs)
                 answer = completion.choices[0].message.content
 
-            try:
-                if model_str in ["o1-preview", "o1-mini", "claude-3.5-sonnet", "o1", "o3-mini"]:
-                    encoding = tiktoken.encoding_for_model("gpt-4o")
-                elif model_str in ["deepseek-chat"]:
-                    encoding = tiktoken.encoding_for_model("cl100k_base")
-                else:
-                    encoding = tiktoken.encoding_for_model(model_str)
-                if model_str not in TOKENS_IN:
-                    TOKENS_IN[model_str] = 0
-                    TOKENS_OUT[model_str] = 0
-                TOKENS_IN[model_str] += len(encoding.encode(system_prompt + prompt))
-                TOKENS_OUT[model_str] += len(encoding.encode(answer))
-                if print_cost:
-                    print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
-            except Exception as e:
-                if print_cost: print(f"Cost approximation has an error? {e}")
+            else:
+                # Default: try OpenAI with the provided model id
+                client = OpenAI()
+                messages = [
+                    {"role": "system", "content": system_prompt or ""},
+                    {"role": "user", "content": prompt or ""}
+                ]
+                kwargs = {"model": normalized, "messages": messages}
+                if temp is not None:
+                    kwargs["temperature"] = temp
+                completion = client.chat.completions.create(**kwargs)
+                answer = completion.choices[0].message.content
+
+            _track_tokens(normalized, system_prompt, prompt, answer, print_cost=print_cost)
             return answer
+
         except Exception as e:
             print("Inference Exception:", e)
             time.sleep(timeout)
             continue
     raise Exception("Max retries: timeout")
-
-
-#print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))

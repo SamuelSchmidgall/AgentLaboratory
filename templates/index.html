@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Your uploaded papers</h1>
+  <p class="muted">Index is automatically updated from <code>uploads/</code>. Use Search to find relevant PDFs fast.</p>
+  <form class="searchbar" action="{{ url_for('search') }}" method="get">
+    <input type="search" name="q" placeholder="Search papers…" aria-label="Search papers" required>
+    <button type="submit">Search</button>
+  </form>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('upload') }}">Upload PDF</a>
+    <a class="btn btn-secondary" href="{{ url_for('update_on_demand') }}">Re-index</a>
+  </div>
+</section>
+
+<section class="list-section">
+  {% if papers %}
+  <table class="table">
+    <thead>
+      <tr><th>Title</th><th>ID</th><th>Preview</th></tr>
+    </thead>
+    <tbody>
+      {% for p in papers %}
+      <tr>
+        <td>{{ p.filename }}</td>
+        <td class="mono">{{ p.id }}</td>
+        <td><a class="btn tiny" href="{{ url_for('view_pdf', paper_id=p.id) }}">View</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">No papers yet. <a href="{{ url_for('upload') }}">Upload one</a> to get started.</p>
+  {% endif %}
+</section>
+{% endblock %}

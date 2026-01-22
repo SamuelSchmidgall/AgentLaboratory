@@ -101,19 +101,27 @@ class AnthropicProvider:
         temperature: float = None,
     ) -> str:
         client = anthropic.Anthropic(api_key=api_key)
+        # Set max_tokens based on model type
+        if 'opus' in model_name:
+            max_tokens = 16384
+        elif 'sonnet' in model_name:
+            max_tokens = 8192
+        else:  # haiku or other
+            max_tokens = 4096
+            
         if temperature is None:
             message = client.messages.create(
                 model=model_name,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
-                max_tokens=8192 if 'sonnet' in model_name else 4096,
+                max_tokens=max_tokens,
             )
         else:
             message = client.messages.create(
                 model=model_name,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_prompt}],
-                max_tokens=8192 if 'sonnet' in model_name else 4096,
+                max_tokens=max_tokens,
                 temperature=temperature,
             )
         return message.content[0].text

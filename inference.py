@@ -16,30 +16,62 @@ def curr_cost_est():
     costmap_in = {
         "gpt-4o": 2.50 / 1000000,
         "gpt-4o-mini": 0.150 / 1000000,
+        "gpt-4.1": 3.00 / 1000000,
+        "gpt-4.1-mini": 0.80 / 1000000,
+        "gpt-4.1-nano": 0.20 / 1000000,
+        "gpt-5.2": 1.75 / 1000000,
+        "gpt-5.2-pro": 21.00 / 1000000,
+        "gpt-5-mini": 0.25 / 1000000,
         "o1": 15.00 / 1000000,
         "o1-preview": 15.00 / 1000000,
         "o1-mini": 1.10 / 1000000,
         "o3-mini": 1.10 / 1000000,
+        "o4-mini": 4.00 / 1000000,
+        "claude-4.5-opus": 5.00 / 1000000,
+        "claude-4.5-sonnet": 3.00 / 1000000,
+        "claude-4.5-haiku": 1.00 / 1000000,
+        "claude-4.1-opus": 15.00 / 1000000,
+        "claude-4-opus": 15.00 / 1000000,
+        "claude-4-sonnet": 3.00 / 1000000,
         "claude-3-7-sonnet": 3.00 / 1000000,
         "claude-3-5-sonnet": 3.00 / 1000000,
         "claude-3-5-haiku": 0.8 / 1000000,
         "deepseek-chat": 0.27 / 1000000,
-        "gemini-2.0-flash": 0.10 / 1000000,
-        "gemini-2.0-flash-lite": 0.075 / 1000000,
+        "gemini-3.0-pro": 2.00 / 1000000,
+        "gemini-3.0-flash": 0.50 / 1000000,
+        "gemini-2.5-pro": 1.25 / 1000000,
+        "gemini-2.5-flash": 0.30 / 1000000,
+        "gemini-2.5-flash-lite": 0.10 / 1000000,
     }
     costmap_out = {
         "gpt-4o": 10.00 / 1000000,
         "gpt-4o-mini": 0.60 / 1000000,
+        "gpt-4.1": 12.00 / 1000000,
+        "gpt-4.1-mini": 3.20 / 1000000,
+        "gpt-4.1-nano": 0.80 / 1000000,
+        "gpt-5.2": 14.00 / 1000000,
+        "gpt-5.2-pro": 168.00 / 1000000,
+        "gpt-5-mini": 2.00 / 1000000,
         "o1": 60.00 / 1000000,
         "o1-preview": 60.00 / 1000000,
         "o1-mini": 4.40 / 1000000,
         "o3-mini": 4.40 / 1000000,
+        "o4-mini": 16.00 / 1000000,
+        "claude-4.5-opus": 25.00 / 1000000,
+        "claude-4.5-sonnet": 15.00 / 1000000,
+        "claude-4.5-haiku": 5.00 / 1000000,
+        "claude-4.1-opus": 75.00 / 1000000,
+        "claude-4-opus": 75.00 / 1000000,
+        "claude-4-sonnet": 15.00 / 1000000,
         "claude-3-7-sonnet": 15.00 / 1000000,
         "claude-3-5-sonnet": 15.00 / 1000000,
         "claude-3-5-haiku": 4.00 / 1000000,
         "deepseek-chat": 1.10 / 1000000,
-        "gemini-2.0-flash": 0.40 / 1000000,
-        "gemini-2.0-flash-lite": 0.30 / 1000000,
+        "gemini-3.0-pro": 12.00 / 1000000,
+        "gemini-3.0-flash": 3.00 / 1000000,
+        "gemini-2.5-pro": 10.00 / 1000000,
+        "gemini-2.5-flash": 2.50 / 1000000,
+        "gemini-2.5-flash-lite": 0.40 / 1000000,
     }
     return sum([costmap_in[_] * TOKENS_IN[_] for _ in TOKENS_IN]) + sum(
         [costmap_out[_] * TOKENS_OUT[_] for _ in TOKENS_OUT])
@@ -123,7 +155,76 @@ def query_model(model_str, prompt, system_prompt,
                     system_prompt=system_prompt,
                     temperature=temp,
                 )
-            elif (model_str.startswith("claude-3-5-sonnet") or
+            elif model_str == "gpt-4.1" or model_str == "gpt-4-1":
+                model_str = "gpt-4.1"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('OPENAI_API_KEY'),
+                    model_name="gpt-4.1",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                )
+            elif model_str == "gpt-4.1-mini" or model_str == "gpt-4-1-mini":
+                model_str = "gpt-4.1-mini"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('OPENAI_API_KEY'),
+                    model_name="gpt-4.1-mini",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                )
+            elif model_str == "gpt-4.1-nano" or model_str == "gpt-4-1-nano":
+                model_str = "gpt-4.1-nano"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('OPENAI_API_KEY'),
+                    model_name="gpt-4.1-nano",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                )
+            elif model_str == "gpt-5.2" or model_str == "gpt5.2" or model_str == "gpt-5-2":
+                model_str = "gpt-5.2"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('OPENAI_API_KEY'),
+                    model_name="gpt-5.2",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                )
+            elif model_str == "gpt-5.2-pro" or model_str == "gpt5.2-pro" or model_str == "gpt-5-2-pro":
+                model_str = "gpt-5.2-pro"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('OPENAI_API_KEY'),
+                    model_name="gpt-5.2-pro",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                )
+            elif model_str == "gpt-5-mini" or model_str == "gpt5-mini" or model_str == "gpt5mini":
+                model_str = "gpt-5-mini"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('OPENAI_API_KEY'),
+                    model_name="gpt-5-mini",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                )
+            elif model_str == "o4-mini":
+                model_str = "o4-mini"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('OPENAI_API_KEY'),
+                    model_name="o4-mini",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                )
+            elif (model_str.startswith("claude-4.5-opus") or
+                  model_str.startswith("claude-4.5-sonnet") or
+                  model_str.startswith("claude-4.5-haiku") or
+                  model_str.startswith("claude-4.1-opus") or
+                  model_str.startswith("claude-4-opus") or
+                  model_str.startswith("claude-4-sonnet") or
+                  model_str.startswith("claude-3-5-sonnet") or
                   model_str.startswith("claude-3-5-haiku") or
                   model_str.startswith("claude-3-7-sonnet")
             ):
@@ -134,7 +235,19 @@ def query_model(model_str, prompt, system_prompt,
                     system_prompt=system_prompt,
                     temperature=temp,
                 )
-                if model_str.startswith("claude-3-5-sonnet"):
+                if model_str.startswith("claude-4.5-opus"):
+                    model_str = "claude-4.5-opus"
+                elif model_str.startswith("claude-4.5-sonnet"):
+                    model_str = "claude-4.5-sonnet"
+                elif model_str.startswith("claude-4.5-haiku"):
+                    model_str = "claude-4.5-haiku"
+                elif model_str.startswith("claude-4.1-opus"):
+                    model_str = "claude-4.1-opus"
+                elif model_str.startswith("claude-4-opus"):
+                    model_str = "claude-4-opus"
+                elif model_str.startswith("claude-4-sonnet"):
+                    model_str = "claude-4-sonnet"
+                elif model_str.startswith("claude-3-5-sonnet"):
                     model_str = "claude-3-5-sonnet"
                 elif model_str.startswith("claude-3-5-haiku"):
                     model_str = "claude-3-5-haiku"
@@ -150,21 +263,61 @@ def query_model(model_str, prompt, system_prompt,
                     temperature=temp,
                     base_url=DEEPSEEK_API_BASE_URL,
                 )
-            elif model_str == "gemini-2.0-flash":
-                model_str = "gemini-2.0-flash"
+            elif model_str == "gemini-3.0-pro" or model_str == "gemini-3-pro" or model_str == "gemini-3.0-pro-preview":
+                model_str = "gemini-3.0-pro"
                 answer = OpenaiProvider.get_response(
                     api_key=os.getenv('GOOGLE_API_KEY'),
-                    model_name=model_str,
+                    model_name="gemini-3-pro-preview",
                     user_prompt=prompt,
                     system_prompt=system_prompt,
                     temperature=temp,
                     base_url=GOOGLE_GENERATIVE_API_BASE_URL,
                 )
-            elif model_str == "gemini-2.0-flash-lite":
-                model_str = "gemini-2.0-flash-lite"
+            elif model_str == "gemini-3.0-flash" or model_str == "gemini-3-flash" or model_str == "gemini-3.0-flash-preview":
+                model_str = "gemini-3.0-flash"
                 answer = OpenaiProvider.get_response(
                     api_key=os.getenv('GOOGLE_API_KEY'),
-                    model_name="gemini-2.0-flash-lite-preview",
+                    model_name="gemini-3-flash-preview",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
+                )
+            elif model_str == "gemini-2.5-pro":
+                model_str = "gemini-2.5-pro"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('GOOGLE_API_KEY'),
+                    model_name="gemini-2.5-pro",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
+                )
+            elif model_str == "gemini-2.5-flash":
+                model_str = "gemini-2.5-flash"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('GOOGLE_API_KEY'),
+                    model_name="gemini-2.5-flash",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
+                )
+            elif model_str == "gemini-2.5-flash-lite":
+                model_str = "gemini-2.5-flash-lite"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('GOOGLE_API_KEY'),
+                    model_name="gemini-2.5-flash-lite",
+                    user_prompt=prompt,
+                    system_prompt=system_prompt,
+                    temperature=temp,
+                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
+                )
+            elif model_str == "gemini-2.0-flash":
+                model_str = "gemini-2.0-flash"
+                answer = OpenaiProvider.get_response(
+                    api_key=os.getenv('GOOGLE_API_KEY'),
+                    model_name=model_str,
                     user_prompt=prompt,
                     system_prompt=system_prompt,
                     temperature=temp,
@@ -189,9 +342,15 @@ def query_model(model_str, prompt, system_prompt,
             if preloaded_openai_api != "ollama":
                 try:
                     if model_str in [
-                        "o1", "o1-preview", "o1-mini", "o3-mini",
+                        "o1", "o1-preview", "o1-mini", "o3-mini", "o4-mini",
+                        "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+                        "gpt-5.2", "gpt-5.2-pro", "gpt-5-mini",
+                        "claude-4.5-opus", "claude-4.5-sonnet", "claude-4.5-haiku",
+                        "claude-4.1-opus", "claude-4-opus", "claude-4-sonnet",
                         "claude-3-7-sonnet", "claude-3-5-sonnet", "claude-3-5-haiku",
-                        "gemini-2.0-flash", "gemini-2.0-flash-lite"
+                        "gemini-3.0-pro", "gemini-3.0-flash",
+                        "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite",
+                        "gemini-2.0-flash"
                     ]:
                         model_encoding = tiktoken.encoding_for_model("gpt-4o")
                     elif model_str in ["deepseek-chat"]:

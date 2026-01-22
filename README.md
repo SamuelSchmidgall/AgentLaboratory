@@ -33,10 +33,21 @@
 
 ### 👾 Currently supported models
 
-* **OpenAI**: o1, o1-preview, o1-mini, gpt-4o
+* **OpenAI**: 
+  * GPT-5 series: gpt-5.2, gpt-5.2-pro, gpt-5-mini
+  * GPT-4.1 series: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano
+  * GPT-4o series: gpt-4o, gpt-4o-mini
+  * o-series (reasoning): o1, o1-preview, o1-mini, o3-mini, o4-mini
 * **DeepSeek**: deepseek-chat (deepseek-v3)
-* **Anthropic**: claude-3-5-sonnet, claude-3-5-haiku
-* **Google**: gemini-2.0-flash, gemini-2.0-flash
+* **Anthropic**: 
+  * Claude 4.5: claude-4.5-opus, claude-4.5-sonnet, claude-4.5-haiku
+  * Claude 4.1: claude-4.1-opus
+  * Claude 4: claude-4-opus, claude-4-sonnet
+  * Claude 3.x: claude-3-5-sonnet, claude-3-5-haiku, claude-3-7-sonnet
+* **Google**: 
+  * Gemini 3.0: gemini-3.0-pro, gemini-3.0-flash
+  * Gemini 2.5: gemini-2.5-pro, gemini-2.5-flash, gemini-2.5-flash-lite
+  * Gemini 2.0: gemini-2.0-flash
 * **Ollama**: Any model that you can find in the [Ollama Website](https://ollama.com/search)
 
 To select a specific llm set the flag `--llm-backend="llm_model"` for example `--llm-backend="gpt-4o"` or `--llm-backend="deepseek-chat"`. Please feel free to add a PR supporting new models according to your need!

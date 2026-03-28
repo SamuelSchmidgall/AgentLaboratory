@@ -335,12 +335,12 @@ class PaperSolver:
         return text
 
     def gen_initial_report(self):
-        num_attempts = 0
         arx = ArxivSearch()
         section_scaffold = str()
         #  1. Abstract 2. Introduction, 3. Background, 4. Methods, 5. Experimental Setup 6. Results, and 7. Discussion
         for _section in ["scaffold", "abstract", "introduction", "related work", "background", "methods", "experimental setup", "results", "discussion"]:
             section_complete = False
+            num_attempts = 0  # reset per-section so previous section's context never bleeds in
             if _section in ["introduction", "related work", "background", "methods", "discussion"]:
                 attempts = 0
                 papers = str()
@@ -378,19 +378,26 @@ class PaperSolver:
                 model_resp = self.clean_text(model_resp)
                 if _section == "scaffold":
                     # minimal scaffold (some other sections can be combined)
+                    scaffold_valid = True
                     for _sect in ["[ABSTRACT HERE]", "[INTRODUCTION HERE]", "[METHODS HERE]", "[RESULTS HERE]", "[DISCUSSION HERE]"]:
                         if _sect not in model_resp:
-                            cmd_str = "Error: scaffold section placeholders were not present (e.g. [ABSTRACT HERE])."
+                            cmd_str = f"Error: scaffold missing placeholder {_sect}."
                             print("@@@ INIT ATTEMPT:", cmd_str)
-                            continue
+                            scaffold_valid = False
+                            break
+                    if not scaffold_valid:
+                        num_attempts += 1
+                        continue
                 elif _section != "scaffold":
                     new_text = extract_prompt(model_resp, "REPLACE")
-                    section_scaffold_temp = section_scaffold_temp.replace(f"[{_section.upper()} HERE]", new_text)
-                    model_resp = '```REPLACE\n' + copy(section_scaffold_temp) + '\n```'
                     if "documentclass{article}" in new_text or "usepackage{" in new_text:
-                            cmd_str = "Error: You must not include packages or documentclass in the text! Your latex must only include the section text, equations, and tables."
-                            print("@@@ INIT ATTEMPT:", cmd_str)
-                            continue
+                        # Model returned a full LaTeX document (correct for REPLACE command).
+                        # Use it directly instead of trying to inject only section text.
+                        model_resp = '```REPLACE\n' + new_text + '\n```'
+                    else:
+                        # Model returned only section text — inject into scaffold at placeholder.
+                        section_scaffold_temp = section_scaffold_temp.replace(f"[{_section.upper()} HERE]", new_text)
+                        model_resp = '```REPLACE\n' + copy(section_scaffold_temp) + '\n```'
                 cmd_str, latex_lines, prev_latex_ret, score = self.process_command(model_resp, scoring=False)
                 print(f"@@@ INIT ATTEMPT: Command Exec // Attempt {num_attempts}: ", str(cmd_str).replace("\n", " | "))
                 #print(f"$$$ Score: {score}")
@@ -582,6 +589,3 @@ class PaperSolver:
             "You are a PhD student who has submitted a paper to an ML conference called ICLR. Your goal was to write a research paper and get high scores from the reviewers so that it get accepted to the conference.\n"
         )
         return phase_str
-
-
-

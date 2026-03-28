@@ -2,79 +2,19 @@ import os
 import tiktoken
 import time
 
-from config import GOOGLE_GENERATIVE_API_BASE_URL, DEEPSEEK_API_BASE_URL, OLLAMA_API_BASE_URL
-from provider import AnthropicProvider, OpenaiProvider
+from config import OLLAMA_API_BASE_URL
+from model_registry import ModelRegistry
+from provider import get_provider_response
 from utils import remove_thinking_process
 
-TOKENS_IN = dict()
-TOKENS_OUT = dict()
+# Global registry instance
+registry = ModelRegistry()
 
 encoding = tiktoken.get_encoding("cl100k_base")
 
 
 def curr_cost_est():
-    costmap_in = {
-        "gpt-4o": 2.50 / 1000000,
-        "gpt-4o-mini": 0.150 / 1000000,
-        "gpt-4.1": 3.00 / 1000000,
-        "gpt-4.1-mini": 0.80 / 1000000,
-        "gpt-4.1-nano": 0.20 / 1000000,
-        "gpt-5.2": 1.75 / 1000000,
-        "gpt-5.2-pro": 21.00 / 1000000,
-        "gpt-5-mini": 0.25 / 1000000,
-        "o1": 15.00 / 1000000,
-        "o1-preview": 15.00 / 1000000,
-        "o1-mini": 1.10 / 1000000,
-        "o3-mini": 1.10 / 1000000,
-        "o4-mini": 4.00 / 1000000,
-        "claude-4.5-opus": 5.00 / 1000000,
-        "claude-4.5-sonnet": 3.00 / 1000000,
-        "claude-4.5-haiku": 1.00 / 1000000,
-        "claude-4.1-opus": 15.00 / 1000000,
-        "claude-4-opus": 15.00 / 1000000,
-        "claude-4-sonnet": 3.00 / 1000000,
-        "claude-3-7-sonnet": 3.00 / 1000000,
-        "claude-3-5-sonnet": 3.00 / 1000000,
-        "claude-3-5-haiku": 0.8 / 1000000,
-        "deepseek-chat": 0.27 / 1000000,
-        "gemini-3.0-pro": 2.00 / 1000000,
-        "gemini-3.0-flash": 0.50 / 1000000,
-        "gemini-2.5-pro": 1.25 / 1000000,
-        "gemini-2.5-flash": 0.30 / 1000000,
-        "gemini-2.5-flash-lite": 0.10 / 1000000,
-    }
-    costmap_out = {
-        "gpt-4o": 10.00 / 1000000,
-        "gpt-4o-mini": 0.60 / 1000000,
-        "gpt-4.1": 12.00 / 1000000,
-        "gpt-4.1-mini": 3.20 / 1000000,
-        "gpt-4.1-nano": 0.80 / 1000000,
-        "gpt-5.2": 14.00 / 1000000,
-        "gpt-5.2-pro": 168.00 / 1000000,
-        "gpt-5-mini": 2.00 / 1000000,
-        "o1": 60.00 / 1000000,
-        "o1-preview": 60.00 / 1000000,
-        "o1-mini": 4.40 / 1000000,
-        "o3-mini": 4.40 / 1000000,
-        "o4-mini": 16.00 / 1000000,
-        "claude-4.5-opus": 25.00 / 1000000,
-        "claude-4.5-sonnet": 15.00 / 1000000,
-        "claude-4.5-haiku": 5.00 / 1000000,
-        "claude-4.1-opus": 75.00 / 1000000,
-        "claude-4-opus": 75.00 / 1000000,
-        "claude-4-sonnet": 15.00 / 1000000,
-        "claude-3-7-sonnet": 15.00 / 1000000,
-        "claude-3-5-sonnet": 15.00 / 1000000,
-        "claude-3-5-haiku": 4.00 / 1000000,
-        "deepseek-chat": 1.10 / 1000000,
-        "gemini-3.0-pro": 12.00 / 1000000,
-        "gemini-3.0-flash": 3.00 / 1000000,
-        "gemini-2.5-pro": 10.00 / 1000000,
-        "gemini-2.5-flash": 2.50 / 1000000,
-        "gemini-2.5-flash-lite": 0.40 / 1000000,
-    }
-    return sum([costmap_in[_] * TOKENS_IN[_] for _ in TOKENS_IN]) + sum(
-        [costmap_out[_] * TOKENS_OUT[_] for _ in TOKENS_OUT])
+    return registry.curr_cost_est()
 
 
 def query_model(model_str, prompt, system_prompt,
@@ -92,282 +32,64 @@ def query_model(model_str, prompt, system_prompt,
     preload_google_api = os.getenv('GOOGLE_API_KEY')
     preload_deepseek_api = os.getenv('DEEPSEEK_API_KEY')
 
-    # If no API key is provided, raise an exception
     if (preloaded_openai_api is None and
         preload_anthropic_api is None and
         preload_google_api is None and
         preload_deepseek_api is None):
         raise Exception("No API key provided in query_model function")
 
+    # Handle Ollama passthrough
+    if preloaded_openai_api == "ollama":
+        return _query_ollama(model_str, prompt, system_prompt, tries, timeout, temp)
+
     for _ in range(tries):
         try:
-            if model_str == "gpt-4o-mini" or model_str == "gpt4omini" or model_str == "gpt-4omini" or model_str == "gpt4o-mini":
-                model_str = "gpt-4o-mini"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="gpt-4o-mini" if version == "0.28" else "gpt-4o-mini-2024-07-18",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "gpt4o" or model_str == "gpt-4o":
-                model_str = "gpt-4o"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="gpt-4o" if version == "0.28" else "gpt-4o-2024-08-06",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "o1-mini":
-                model_str = "o1-mini"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="o1-mini" if version == "0.28" else "o1-mini-2024-09-12",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "o3-mini":
-                model_str = "o3-mini"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="o3-mini" if version == "0.28" else "o3-mini-2025-01-31",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "o1":
-                model_str = "o1"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="o1" if version == "0.28" else "o1-2024-12-17",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "o1-preview":
-                model_str = "o1-preview"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="o1-preview" if version == "0.28" else "o1-preview-2024-12-17",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "gpt-4.1" or model_str == "gpt-4-1":
-                model_str = "gpt-4.1"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="gpt-4.1",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "gpt-4.1-mini" or model_str == "gpt-4-1-mini":
-                model_str = "gpt-4.1-mini"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="gpt-4.1-mini",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "gpt-4.1-nano" or model_str == "gpt-4-1-nano":
-                model_str = "gpt-4.1-nano"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="gpt-4.1-nano",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "gpt-5.2" or model_str == "gpt5.2" or model_str == "gpt-5-2":
-                model_str = "gpt-5.2"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="gpt-5.2",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "gpt-5.2-pro" or model_str == "gpt5.2-pro" or model_str == "gpt-5-2-pro":
-                model_str = "gpt-5.2-pro"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="gpt-5.2-pro",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "gpt-5-mini" or model_str == "gpt5-mini" or model_str == "gpt5mini":
-                model_str = "gpt-5-mini"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="gpt-5-mini",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif model_str == "o4-mini":
-                model_str = "o4-mini"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('OPENAI_API_KEY'),
-                    model_name="o4-mini",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-            elif (model_str.startswith("claude-4.5-opus") or
-                  model_str.startswith("claude-4.5-sonnet") or
-                  model_str.startswith("claude-4.5-haiku") or
-                  model_str.startswith("claude-4.1-opus") or
-                  model_str.startswith("claude-4-opus") or
-                  model_str.startswith("claude-4-sonnet") or
-                  model_str.startswith("claude-3-5-sonnet") or
-                  model_str.startswith("claude-3-5-haiku") or
-                  model_str.startswith("claude-3-7-sonnet")
-            ):
-                answer = AnthropicProvider.get_response(
-                    api_key=os.environ["ANTHROPIC_API_KEY"],
-                    model_name=model_str,
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                )
-                if model_str.startswith("claude-4.5-opus"):
-                    model_str = "claude-4.5-opus"
-                elif model_str.startswith("claude-4.5-sonnet"):
-                    model_str = "claude-4.5-sonnet"
-                elif model_str.startswith("claude-4.5-haiku"):
-                    model_str = "claude-4.5-haiku"
-                elif model_str.startswith("claude-4.1-opus"):
-                    model_str = "claude-4.1-opus"
-                elif model_str.startswith("claude-4-opus"):
-                    model_str = "claude-4-opus"
-                elif model_str.startswith("claude-4-sonnet"):
-                    model_str = "claude-4-sonnet"
-                elif model_str.startswith("claude-3-5-sonnet"):
-                    model_str = "claude-3-5-sonnet"
-                elif model_str.startswith("claude-3-5-haiku"):
-                    model_str = "claude-3-5-haiku"
-                elif model_str.startswith("claude-3-7-sonnet"):
-                    model_str = "claude-3-7-sonnet"
-            elif model_str == "deepseek-chat":
-                model_str = "deepseek-chat"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('DEEPSEEK_API_KEY'),
-                    model_name="deepseek-chat",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                    base_url=DEEPSEEK_API_BASE_URL,
-                )
-            elif model_str == "gemini-3.0-pro" or model_str == "gemini-3-pro" or model_str == "gemini-3.0-pro-preview":
-                model_str = "gemini-3.0-pro"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('GOOGLE_API_KEY'),
-                    model_name="gemini-3-pro-preview",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
-                )
-            elif model_str == "gemini-3.0-flash" or model_str == "gemini-3-flash" or model_str == "gemini-3.0-flash-preview":
-                model_str = "gemini-3.0-flash"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('GOOGLE_API_KEY'),
-                    model_name="gemini-3-flash-preview",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
-                )
-            elif model_str == "gemini-2.5-pro":
-                model_str = "gemini-2.5-pro"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('GOOGLE_API_KEY'),
-                    model_name="gemini-2.5-pro",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
-                )
-            elif model_str == "gemini-2.5-flash":
-                model_str = "gemini-2.5-flash"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('GOOGLE_API_KEY'),
-                    model_name="gemini-2.5-flash",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
-                )
-            elif model_str == "gemini-2.5-flash-lite":
-                model_str = "gemini-2.5-flash-lite"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('GOOGLE_API_KEY'),
-                    model_name="gemini-2.5-flash-lite",
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
-                )
-            elif model_str == "gemini-2.0-flash":
-                model_str = "gemini-2.0-flash"
-                answer = OpenaiProvider.get_response(
-                    api_key=os.getenv('GOOGLE_API_KEY'),
-                    model_name=model_str,
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                    base_url=GOOGLE_GENERATIVE_API_BASE_URL,
-                )
-            elif preloaded_openai_api == "ollama":
-                answer = OpenaiProvider.get_response(
-                    api_key="ollama",
-                    model_name=model_str,
-                    user_prompt=prompt,
-                    system_prompt=system_prompt,
-                    temperature=temp,
-                    base_url=OLLAMA_API_BASE_URL,
-                )
-            else:
-                raise Exception(f"Model {model_str} not found")
+            # Resolve model via registry
+            canonical = registry.get_canonical_for_cost(model_str)
+            provider = registry.get_provider(model_str)
+            api_model_name = registry.get_api_model_name(model_str)
+            base_url = registry.get_base_url(model_str)
 
-            # Remove the thinking process from the answer
+            # Determine API key based on provider
+            api_key_map = {
+                "openai": os.getenv('OPENAI_API_KEY'),
+                "anthropic": os.getenv('ANTHROPIC_API_KEY'),
+                "google": os.getenv('GOOGLE_API_KEY'),
+                "deepseek": os.getenv('DEEPSEEK_API_KEY'),
+            }
+            api_key = api_key_map.get(provider)
+            if api_key is None:
+                raise Exception(f"No API key set for provider '{provider}'")
+
+            answer = get_provider_response(
+                provider=provider,
+                api_key=api_key,
+                model_name=api_model_name,
+                user_prompt=prompt,
+                system_prompt=system_prompt,
+                temperature=temp,
+                base_url=base_url,
+            )
+
             answer = remove_thinking_process(answer)
 
-            # Cost estimation when not using Ollama
-            if preloaded_openai_api != "ollama":
+            # Cost estimation
+            try:
                 try:
-                    if model_str in [
-                        "o1", "o1-preview", "o1-mini", "o3-mini", "o4-mini",
-                        "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
-                        "gpt-5.2", "gpt-5.2-pro", "gpt-5-mini",
-                        "claude-4.5-opus", "claude-4.5-sonnet", "claude-4.5-haiku",
-                        "claude-4.1-opus", "claude-4-opus", "claude-4-sonnet",
-                        "claude-3-7-sonnet", "claude-3-5-sonnet", "claude-3-5-haiku",
-                        "gemini-3.0-pro", "gemini-3.0-flash",
-                        "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite",
-                        "gemini-2.0-flash"
-                    ]:
-                        model_encoding = tiktoken.encoding_for_model("gpt-4o")
-                    elif model_str in ["deepseek-chat"]:
-                        model_encoding = tiktoken.get_encoding("cl100k_base")
-                    else:
-                        model_encoding = tiktoken.encoding_for_model(model_str)
-                    if model_str not in TOKENS_IN:
-                        TOKENS_IN[model_str] = 0
-                        TOKENS_OUT[model_str] = 0
-                    TOKENS_IN[model_str] += len(model_encoding.encode(system_prompt + prompt))
-                    TOKENS_OUT[model_str] += len(model_encoding.encode(answer))
-                    if print_cost:
-                        print(
-                            f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
-                except Exception as e:
-                    if print_cost:
-                        print(f"Cost approximation has an error? {e}")
+                    model_encoding = tiktoken.encoding_for_model(canonical)
+                except KeyError:
+                    model_encoding = tiktoken.encoding_for_model("gpt-4o")
+                if canonical not in registry.tokens_in:
+                    registry.tokens_in[canonical] = 0
+                    registry.tokens_out[canonical] = 0
+                registry.tokens_in[canonical] += len(model_encoding.encode(system_prompt + prompt))
+                registry.tokens_out[canonical] += len(model_encoding.encode(answer))
+                if print_cost:
+                    print(f"Current experiment cost = ${curr_cost_est()}, ** Approximate values, may not reflect true cost")
+            except Exception as e:
+                if print_cost:
+                    print(f"Cost approximation has an error? {e}")
+
             return answer
         except Exception as e:
             print("Inference Exception:", e)
@@ -375,4 +97,23 @@ def query_model(model_str, prompt, system_prompt,
             continue
     raise Exception("Max retries: timeout")
 
-# print(query_model(model_str="o1-mini", prompt="hi", system_prompt="hey"))
+
+def _query_ollama(model_str, prompt, system_prompt, tries, timeout, temp):
+    """Handle Ollama models — bypass registry, pass model string directly."""
+    from provider import OpenaiProvider
+    for _ in range(tries):
+        try:
+            answer = OpenaiProvider.get_response(
+                api_key="ollama",
+                model_name=model_str,
+                user_prompt=prompt,
+                system_prompt=system_prompt,
+                temperature=temp,
+                base_url=OLLAMA_API_BASE_URL,
+            )
+            return remove_thinking_process(answer)
+        except Exception as e:
+            print("Inference Exception:", e)
+            time.sleep(timeout)
+            continue
+    raise Exception("Max retries: timeout")

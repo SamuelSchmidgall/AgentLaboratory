@@ -125,3 +125,25 @@ class AnthropicProvider:
                 temperature=temperature,
             )
         return message.content[0].text
+
+
+def get_provider_response(provider, api_key, model_name, user_prompt, system_prompt, temperature=None, base_url=None):
+    """Dispatch to the correct provider based on provider string."""
+    if provider == "anthropic":
+        return AnthropicProvider.get_response(
+            api_key=api_key,
+            model_name=model_name,
+            user_prompt=user_prompt,
+            system_prompt=system_prompt,
+            temperature=temperature,
+        )
+    else:
+        # openai, google, deepseek, ollama all use OpenAI-compatible API
+        return OpenaiProvider.get_response(
+            api_key=api_key,
+            model_name=model_name,
+            user_prompt=user_prompt,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            base_url=base_url,
+        )

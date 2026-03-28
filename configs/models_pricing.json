@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-03-28T14:47:47.477030+00:00",
+  "last_updated": "2026-03-28T14:49:47.830867+00:00",
   "models": {
     "gpt-4o": {
       "provider": "openai",
@@ -228,8 +228,110 @@
       "provider": "google",
       "api_model_name": "gemini-2.0-flash",
       "aliases": [],
-      "cost_per_million_input": null,
-      "cost_per_million_output": null
+      "cost_per_million_input": 0.1,
+      "cost_per_million_output": 0.4
+    },
+    "gpt-5.4": {
+      "provider": "openai",
+      "api_model_name": "gpt-5.4",
+      "aliases": [
+        "gpt5.4",
+        "gpt-5-4"
+      ],
+      "cost_per_million_input": 2.5,
+      "cost_per_million_output": 15.0
+    },
+    "gpt-5.4-mini": {
+      "provider": "openai",
+      "api_model_name": "gpt-5.4-mini",
+      "aliases": [
+        "gpt5.4-mini",
+        "gpt-5-4-mini"
+      ],
+      "cost_per_million_input": 0.75,
+      "cost_per_million_output": 4.5
+    },
+    "gpt-5.4-nano": {
+      "provider": "openai",
+      "api_model_name": "gpt-5.4-nano",
+      "aliases": [
+        "gpt5.4-nano",
+        "gpt-5-4-nano"
+      ],
+      "cost_per_million_input": 0.2,
+      "cost_per_million_output": 1.25
+    },
+    "gpt-5.4-pro": {
+      "provider": "openai",
+      "api_model_name": "gpt-5.4-pro",
+      "aliases": [
+        "gpt5.4-pro",
+        "gpt-5-4-pro"
+      ],
+      "cost_per_million_input": 30.0,
+      "cost_per_million_output": 180.0
+    },
+    "o3": {
+      "provider": "openai",
+      "api_model_name": "o3",
+      "aliases": [],
+      "cost_per_million_input": 2.0,
+      "cost_per_million_output": 8.0
+    },
+    "o3-pro": {
+      "provider": "openai",
+      "api_model_name": "o3-pro",
+      "aliases": [],
+      "cost_per_million_input": 20.0,
+      "cost_per_million_output": 80.0
+    },
+    "claude-4.6-opus": {
+      "provider": "anthropic",
+      "api_model_name": "claude-opus-4-6",
+      "aliases": [
+        "claude-opus-4.6",
+        "claude-opus-4-6"
+      ],
+      "cost_per_million_input": 5.0,
+      "cost_per_million_output": 25.0
+    },
+    "claude-4.6-sonnet": {
+      "provider": "anthropic",
+      "api_model_name": "claude-sonnet-4-6",
+      "aliases": [
+        "claude-sonnet-4.6",
+        "claude-sonnet-4-6"
+      ],
+      "cost_per_million_input": 3.0,
+      "cost_per_million_output": 15.0
+    },
+    "gemini-3.1-pro": {
+      "provider": "google",
+      "api_model_name": "gemini-3.1-pro-preview",
+      "aliases": [
+        "gemini-3-1-pro",
+        "gemini-3.1-pro-preview"
+      ],
+      "cost_per_million_input": 2.0,
+      "cost_per_million_output": 12.0
+    },
+    "gemini-3.1-flash-lite": {
+      "provider": "google",
+      "api_model_name": "gemini-3.1-flash-lite-preview",
+      "aliases": [
+        "gemini-3-1-flash-lite"
+      ],
+      "cost_per_million_input": 0.25,
+      "cost_per_million_output": 1.5
+    },
+    "deepseek-r1": {
+      "provider": "deepseek",
+      "api_model_name": "deepseek-reasoner",
+      "aliases": [
+        "deepseek-reasoner"
+      ],
+      "cost_per_million_input": 0.55,
+      "cost_per_million_output": 2.0
     }
   }
 }

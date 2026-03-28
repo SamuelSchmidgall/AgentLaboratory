@@ -4,16 +4,26 @@ import re
 from datetime import datetime, timezone, timedelta
 
 import requests
-from bs4 import BeautifulSoup
 
 from config import GOOGLE_GENERATIVE_API_BASE_URL, DEEPSEEK_API_BASE_URL
 
-FETCH_TIMEOUT = 10
+FETCH_TIMEOUT = 15
 
-# Model ID prefixes to exclude from API discovery (embeddings, image gen, etc.)
+# Pricing aggregator API — single source for all providers
+PRICING_API_URL = "https://pricepertoken.com/api/pricing"
+
+# Map pricepertoken.com provider_name to our internal provider names
+PROVIDER_NAME_MAP = {
+    "OpenAI": "openai",
+    "Anthropic": "anthropic",
+    "Google": "google",
+    "Deepseek": "deepseek",
+}
+
+# Model ID prefixes to exclude (embeddings, image gen, etc.)
 EXCLUDED_PREFIXES = (
     "text-embedding", "embedding", "dall-e", "tts-", "whisper",
-    "davinci", "babbage", "curie", "ada",
+    "davinci", "babbage", "curie", "ada", "text-ada", "text-davinci",
 )
 
 # Provider API endpoints for model discovery
@@ -22,14 +32,6 @@ PROVIDER_API_ENDPOINTS = {
     "anthropic": "https://api.anthropic.com/v1/models",
     "google": f"{GOOGLE_GENERATIVE_API_BASE_URL}models",
     "deepseek": f"{DEEPSEEK_API_BASE_URL}/models",
-}
-
-# Provider pricing page URLs
-PROVIDER_PRICING_URLS = {
-    "openai": "https://platform.openai.com/docs/pricing",
-    "anthropic": "https://docs.anthropic.com/en/docs/about-claude/models",
-    "google": "https://ai.google.dev/gemini-api/docs/pricing",
-    "deepseek": "https://api-docs.deepseek.com/quick_start/pricing",
 }
 
 
@@ -42,7 +44,7 @@ def fetch_models_from_api(provider, api_key):
     try:
         headers = {}
         params = {}
-        if provider == "openai" or provider == "deepseek":
+        if provider in ("openai", "deepseek"):
             headers["Authorization"] = f"Bearer {api_key}"
         elif provider == "anthropic":
             headers["x-api-key"] = api_key
@@ -70,105 +72,55 @@ def fetch_models_from_api(provider, api_key):
         return []
 
 
-def fetch_pricing(provider):
-    """Scrape pricing page for a provider. Returns dict of {model_name: {input: float, output: float}}.
-    Returns empty dict on failure."""
-    url = PROVIDER_PRICING_URLS.get(provider)
-    if not url:
-        return {}
+def fetch_pricing_from_aggregator():
+    """Fetch pricing for all providers from pricepertoken.com.
 
+    Returns:
+        dict of {provider: {model_id: {input: float, output: float}}}
+        where input/output are per-million-token prices in USD.
+    """
     try:
-        resp = requests.get(url, timeout=FETCH_TIMEOUT, headers={"User-Agent": "AgentLaboratory/1.0"})
+        resp = requests.get(PRICING_API_URL, timeout=FETCH_TIMEOUT, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; AgentLaboratory/1.0)",
+        })
         if resp.status_code != 200:
-            print(f"Warning: {provider} pricing page returned status {resp.status_code}")
+            print(f"Warning: Pricing API returned status {resp.status_code}")
             return {}
 
-        soup = BeautifulSoup(resp.text, "html.parser")
+        data = resp.json()
+        results = data.get("results", [])
+        print(f"  Pricing API returned {len(results)} models")
 
-        if provider == "openai":
-            return _parse_openai_pricing(soup)
-        elif provider == "anthropic":
-            return _parse_anthropic_pricing(soup)
-        elif provider == "google":
-            return _parse_google_pricing(soup)
-        elif provider == "deepseek":
-            return _parse_deepseek_pricing(soup)
+        pricing = {}
+        for entry in results:
+            provider_name = entry.get("provider_name", "")
+            provider = PROVIDER_NAME_MAP.get(provider_name)
+            if provider is None:
+                continue
+
+            model_id = entry.get("model", "")
+            input_price = entry.get("input_price_per_1m_tokens")
+            output_price = entry.get("output_price_per_1m_tokens")
+
+            if not model_id or input_price is None or output_price is None:
+                continue
+
+            if provider not in pricing:
+                pricing[provider] = {}
+
+            pricing[provider][model_id] = {
+                "input": float(input_price),
+                "output": float(output_price),
+            }
+
+        for p, models in pricing.items():
+            print(f"  {p}: {len(models)} models with pricing")
+
+        return pricing
 
     except Exception as e:
-        print(f"Warning: Failed to fetch pricing for {provider}: {e}")
+        print(f"Warning: Failed to fetch pricing from aggregator: {e}")
         return {}
-
-
-def _parse_price_str(text):
-    """Extract a numeric price from a string like '$2.50' or '$0.30 / 1M tokens'."""
-    match = re.search(r'\$?([\d.]+)', text.strip())
-    if match:
-        return float(match.group(1))
-    return None
-
-
-def _parse_openai_pricing(soup):
-    """Parse OpenAI pricing page. Returns {model: {input: float, output: float}}."""
-    pricing = {}
-    for table in soup.find_all("table"):
-        rows = table.find_all("tr")
-        for row in rows:
-            cells = row.find_all(["td", "th"])
-            if len(cells) >= 3:
-                model_name = cells[0].get_text(strip=True).lower()
-                input_price = _parse_price_str(cells[1].get_text(strip=True))
-                output_price = _parse_price_str(cells[2].get_text(strip=True))
-                if input_price is not None and output_price is not None:
-                    pricing[model_name] = {"input": input_price, "output": output_price}
-    return pricing
-
-
-def _parse_anthropic_pricing(soup):
-    """Parse Anthropic pricing page."""
-    pricing = {}
-    for table in soup.find_all("table"):
-        rows = table.find_all("tr")
-        for row in rows:
-            cells = row.find_all(["td", "th"])
-            if len(cells) >= 3:
-                model_name = cells[0].get_text(strip=True).lower()
-                input_price = _parse_price_str(cells[1].get_text(strip=True))
-                output_price = _parse_price_str(cells[2].get_text(strip=True))
-                if input_price is not None and output_price is not None:
-                    pricing[model_name] = {"input": input_price, "output": output_price}
-    return pricing
-
-
-def _parse_google_pricing(soup):
-    """Parse Google pricing page."""
-    pricing = {}
-    for table in soup.find_all("table"):
-        rows = table.find_all("tr")
-        for row in rows:
-            cells = row.find_all(["td", "th"])
-            if len(cells) >= 3:
-                model_name = cells[0].get_text(strip=True).lower()
-                input_price = _parse_price_str(cells[1].get_text(strip=True))
-                output_price = _parse_price_str(cells[2].get_text(strip=True))
-                if input_price is not None and output_price is not None:
-                    pricing[model_name] = {"input": input_price, "output": output_price}
-    return pricing
-
-
-def _parse_deepseek_pricing(soup):
-    """Parse DeepSeek pricing page."""
-    pricing = {}
-    for table in soup.find_all("table"):
-        rows = table.find_all("tr")
-        for row in rows:
-            cells = row.find_all(["td", "th"])
-            if len(cells) >= 3:
-                model_name = cells[0].get_text(strip=True).lower()
-                input_price = _parse_price_str(cells[1].get_text(strip=True))
-                output_price = _parse_price_str(cells[2].get_text(strip=True))
-                if input_price is not None and output_price is not None:
-                    pricing[model_name] = {"input": input_price, "output": output_price}
-    return pricing
 
 
 def merge_discovered_models(existing_data, discovered_by_provider, pricing_by_provider=None):
@@ -209,6 +161,14 @@ def merge_discovered_models(existing_data, discovered_by_provider, pricing_by_pr
                     models[model_id]["cost_per_million_input"] = price_info.get("input", models[model_id].get("cost_per_million_input"))
                     models[model_id]["cost_per_million_output"] = price_info.get("output", models[model_id].get("cost_per_million_output"))
 
+    # Also update pricing for existing models that weren't in discovered_by_provider
+    # (e.g. models already in our JSON that have updated prices)
+    for provider, provider_pricing in pricing_by_provider.items():
+        for model_id, price_info in provider_pricing.items():
+            if model_id in models and price_info:
+                models[model_id]["cost_per_million_input"] = price_info.get("input", models[model_id].get("cost_per_million_input"))
+                models[model_id]["cost_per_million_output"] = price_info.get("output", models[model_id].get("cost_per_million_output"))
+
     existing_data["models"] = models
     existing_data["last_updated"] = datetime.now(timezone.utc).isoformat()
     return existing_data
@@ -247,7 +207,11 @@ def update_models_pricing(config_path, force=False):
 
     print("Updating model pricing data...")
 
-    # Gather API keys
+    # Step 1: Fetch pricing from aggregator (no API keys needed!)
+    print("  Fetching pricing from pricepertoken.com...")
+    pricing = fetch_pricing_from_aggregator()
+
+    # Step 2: Discover models via provider APIs (requires API keys)
     api_keys = {
         "openai": os.getenv("OPENAI_API_KEY"),
         "anthropic": os.getenv("ANTHROPIC_API_KEY"),
@@ -255,26 +219,23 @@ def update_models_pricing(config_path, force=False):
         "deepseek": os.getenv("DEEPSEEK_API_KEY"),
     }
 
-    # Discover models via APIs
     discovered = {}
     for provider, key in api_keys.items():
         if key and key != "ollama":
-            print(f"  Fetching models from {provider}...")
+            print(f"  Fetching models from {provider} API...")
             models = fetch_models_from_api(provider, key)
             if models:
                 discovered[provider] = models
                 print(f"  Found {len(models)} models from {provider}")
+        else:
+            print(f"  Skipping {provider} API (no API key set)")
 
-    # Scrape pricing
-    pricing = {}
-    for provider in ["openai", "anthropic", "google", "deepseek"]:
-        print(f"  Fetching pricing from {provider}...")
-        provider_pricing = fetch_pricing(provider)
-        if provider_pricing:
-            pricing[provider] = provider_pricing
-            print(f"  Got pricing for {len(provider_pricing)} models from {provider}")
+    if not discovered and not pricing:
+        print("Warning: No data fetched. Check your network connection.")
+        # Still update timestamp to avoid repeated failures
+        existing_data["last_updated"] = datetime.now(timezone.utc).isoformat()
 
-    # Merge
+    # Step 3: Merge
     updated_data = merge_discovered_models(existing_data, discovered, pricing)
 
     # Write

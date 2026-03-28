@@ -1,0 +1,208 @@
+{
+  "last_updated": "2026-03-28T00:00:00Z",
+  "models": {
+    "gpt-4o": {
+      "provider": "openai",
+      "api_model_name": "gpt-4o-2024-08-06",
+      "aliases": ["gpt4o"],
+      "cost_per_million_input": 2.50,
+      "cost_per_million_output": 10.00
+    },
+    "gpt-4o-mini": {
+      "provider": "openai",
+      "api_model_name": "gpt-4o-mini-2024-07-18",
+      "aliases": ["gpt4omini", "gpt-4omini", "gpt4o-mini"],
+      "cost_per_million_input": 0.150,
+      "cost_per_million_output": 0.60
+    },
+    "gpt-4.1": {
+      "provider": "openai",
+      "api_model_name": "gpt-4.1",
+      "aliases": ["gpt-4-1"],
+      "cost_per_million_input": 3.00,
+      "cost_per_million_output": 12.00
+    },
+    "gpt-4.1-mini": {
+      "provider": "openai",
+      "api_model_name": "gpt-4.1-mini",
+      "aliases": ["gpt-4-1-mini"],
+      "cost_per_million_input": 0.80,
+      "cost_per_million_output": 3.20
+    },
+    "gpt-4.1-nano": {
+      "provider": "openai",
+      "api_model_name": "gpt-4.1-nano",
+      "aliases": ["gpt-4-1-nano"],
+      "cost_per_million_input": 0.20,
+      "cost_per_million_output": 0.80
+    },
+    "gpt-5.2": {
+      "provider": "openai",
+      "api_model_name": "gpt-5.2",
+      "aliases": ["gpt5.2", "gpt-5-2"],
+      "cost_per_million_input": 1.75,
+      "cost_per_million_output": 14.00
+    },
+    "gpt-5.2-pro": {
+      "provider": "openai",
+      "api_model_name": "gpt-5.2-pro",
+      "aliases": ["gpt5.2-pro", "gpt-5-2-pro"],
+      "cost_per_million_input": 21.00,
+      "cost_per_million_output": 168.00
+    },
+    "gpt-5-mini": {
+      "provider": "openai",
+      "api_model_name": "gpt-5-mini",
+      "aliases": ["gpt5-mini", "gpt5mini"],
+      "cost_per_million_input": 0.25,
+      "cost_per_million_output": 2.00
+    },
+    "o1": {
+      "provider": "openai",
+      "api_model_name": "o1-2024-12-17",
+      "aliases": [],
+      "cost_per_million_input": 15.00,
+      "cost_per_million_output": 60.00
+    },
+    "o1-preview": {
+      "provider": "openai",
+      "api_model_name": "o1-preview-2024-12-17",
+      "aliases": [],
+      "cost_per_million_input": 15.00,
+      "cost_per_million_output": 60.00
+    },
+    "o1-mini": {
+      "provider": "openai",
+      "api_model_name": "o1-mini-2024-09-12",
+      "aliases": [],
+      "cost_per_million_input": 1.10,
+      "cost_per_million_output": 4.40
+    },
+    "o3-mini": {
+      "provider": "openai",
+      "api_model_name": "o3-mini-2025-01-31",
+      "aliases": [],
+      "cost_per_million_input": 1.10,
+      "cost_per_million_output": 4.40
+    },
+    "o4-mini": {
+      "provider": "openai",
+      "api_model_name": "o4-mini",
+      "aliases": [],
+      "cost_per_million_input": 4.00,
+      "cost_per_million_output": 16.00
+    },
+    "claude-4.5-opus": {
+      "provider": "anthropic",
+      "api_model_name": "claude-4.5-opus",
+      "aliases": [],
+      "cost_per_million_input": 5.00,
+      "cost_per_million_output": 25.00
+    },
+    "claude-4.5-sonnet": {
+      "provider": "anthropic",
+      "api_model_name": "claude-4.5-sonnet",
+      "aliases": [],
+      "cost_per_million_input": 3.00,
+      "cost_per_million_output": 15.00
+    },
+    "claude-4.5-haiku": {
+      "provider": "anthropic",
+      "api_model_name": "claude-4.5-haiku",
+      "aliases": [],
+      "cost_per_million_input": 1.00,
+      "cost_per_million_output": 5.00
+    },
+    "claude-4.1-opus": {
+      "provider": "anthropic",
+      "api_model_name": "claude-4.1-opus",
+      "aliases": [],
+      "cost_per_million_input": 15.00,
+      "cost_per_million_output": 75.00
+    },
+    "claude-4-opus": {
+      "provider": "anthropic",
+      "api_model_name": "claude-4-opus",
+      "aliases": [],
+      "cost_per_million_input": 15.00,
+      "cost_per_million_output": 75.00
+    },
+    "claude-4-sonnet": {
+      "provider": "anthropic",
+      "api_model_name": "claude-4-sonnet",
+      "aliases": [],
+      "cost_per_million_input": 3.00,
+      "cost_per_million_output": 15.00
+    },
+    "claude-3-7-sonnet": {
+      "provider": "anthropic",
+      "api_model_name": "claude-3-7-sonnet",
+      "aliases": [],
+      "cost_per_million_input": 3.00,
+      "cost_per_million_output": 15.00
+    },
+    "claude-3-5-sonnet": {
+      "provider": "anthropic",
+      "api_model_name": "claude-3-5-sonnet",
+      "aliases": [],
+      "cost_per_million_input": 3.00,
+      "cost_per_million_output": 15.00
+    },
+    "claude-3-5-haiku": {
+      "provider": "anthropic",
+      "api_model_name": "claude-3-5-haiku",
+      "aliases": [],
+      "cost_per_million_input": 0.80,
+      "cost_per_million_output": 4.00
+    },
+    "deepseek-chat": {
+      "provider": "deepseek",
+      "api_model_name": "deepseek-chat",
+      "aliases": [],
+      "cost_per_million_input": 0.27,
+      "cost_per_million_output": 1.10
+    },
+    "gemini-3.0-pro": {
+      "provider": "google",
+      "api_model_name": "gemini-3-pro-preview",
+      "aliases": ["gemini-3-pro", "gemini-3.0-pro-preview"],
+      "cost_per_million_input": 2.00,
+      "cost_per_million_output": 12.00
+    },
+    "gemini-3.0-flash": {
+      "provider": "google",
+      "api_model_name": "gemini-3-flash-preview",
+      "aliases": ["gemini-3-flash", "gemini-3.0-flash-preview"],
+      "cost_per_million_input": 0.50,
+      "cost_per_million_output": 3.00
+    },
+    "gemini-2.5-pro": {
+      "provider": "google",
+      "api_model_name": "gemini-2.5-pro",
+      "aliases": [],
+      "cost_per_million_input": 1.25,
+      "cost_per_million_output": 10.00
+    },
+    "gemini-2.5-flash": {
+      "provider": "google",
+      "api_model_name": "gemini-2.5-flash",
+      "aliases": [],
+      "cost_per_million_input": 0.30,
+      "cost_per_million_output": 2.50
+    },
+    "gemini-2.5-flash-lite": {
+      "provider": "google",
+      "api_model_name": "gemini-2.5-flash-lite",
+      "aliases": [],
+      "cost_per_million_input": 0.10,
+      "cost_per_million_output": 0.40
+    },
+    "gemini-2.0-flash": {
+      "provider": "google",
+      "api_model_name": "gemini-2.0-flash",
+      "aliases": [],
+      "cost_per_million_input": null,
+      "cost_per_million_output": null
+    }
+  }
+}

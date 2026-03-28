@@ -181,21 +181,10 @@ def run_research_process(
 
 
 def create_gradio_config() -> gr.Blocks:
-    # Standard backend options for the dropdown
-    llm_backend_options = [
-        "o1",
-        "o1-preview",
-        "o1-mini",
-        "o3-mini",
-        "gpt-4o",
-        "gpt-4o-mini",
-        "deepseek-chat",
-        "claude-3-7-sonnet-latest",
-        "claude-3-5-sonnet-latest",
-        "claude-3-5-haiku-latest",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-    ]
+    # Populate backend options from model registry
+    from model_registry import ModelRegistry
+    _registry = ModelRegistry(auto_refresh=False)
+    llm_backend_options = _registry.list_models()
     languages = [
         "English", "Chinese-Simplified", "Chinese-Traditional",
         "Japanese", "Korean", "Filipino", "French",

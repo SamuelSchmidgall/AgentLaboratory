@@ -8,6 +8,7 @@ from flask_cors import CORS
 from settings_manager import SettingsManager
 from config import TASK_NOTE_LLM
 from utils import validate_task_note_config
+from model_registry import ModelRegistry
 
 
 # Check if the WebUI repository is cloned
@@ -277,6 +278,12 @@ def api_settings():
 def api_saves():
     saves = get_existing_saves()
     return jsonify({"saves": saves})
+
+# Endpoint to retrieve available models from the registry.
+@app.route('/api/models', methods=['GET'])
+def api_models():
+    reg = ModelRegistry(auto_refresh=False)
+    return jsonify({"models": reg.list_models()})
 
 # Endpoint to update the WebUI
 @app.route('/api/updateWebUI', methods=['POST'])

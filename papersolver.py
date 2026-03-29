@@ -345,7 +345,7 @@ class PaperSolver:
                 attempts = 0
                 papers = str()
                 first_attempt = True
-                while len(papers) == 0:
+                while not papers:
                     att_str = str()
                     if attempts > 5:
                         break
@@ -356,7 +356,7 @@ class PaperSolver:
                     papers = arx.find_papers_by_str(query=search_query, N=10)
                     first_attempt = False
                     attempts += 1
-                if len(papers) != 0:
+                if papers:
                     self.section_related_work[_section] = papers
             while not section_complete:
                 section_scaffold_temp = copy(section_scaffold)

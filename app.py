@@ -1,11 +1,11 @@
 import random, time
+from functools import lru_cache
 
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 import os
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 from flask_sqlalchemy import SQLAlchemy
-from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
@@ -58,8 +58,11 @@ def update_papers_from_uploads():
     return
     #raise Exception("FAILED TO UPDATE")
 
-# Load a pre-trained sentence transformer model
-model = SentenceTransformer('all-MiniLM-L6-v2')
+@lru_cache(maxsize=1)
+def get_embedding_model():
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer('all-MiniLM-L6-v2')
 
 @app.route('/update', methods=['GET'])
 def update_on_demand():
@@ -106,6 +109,7 @@ def upload():
 def search():
     query = request.args.get('q', '')
     if query:
+        model = get_embedding_model()
         papers = Paper.query.all()
         query_embedding = model.encode([query])
         paper_texts = [paper.text for paper in papers if paper.text]
@@ -123,6 +127,7 @@ def api_search():
     query = request.args.get('q', '')
     if not query:
         return jsonify({'error': 'No query provided'}), 400
+    model = get_embedding_model()
     papers = Paper.query.all()
     if not papers:
         return jsonify({'query': query, 'results': []})

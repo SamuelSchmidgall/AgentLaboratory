@@ -1,6 +1,5 @@
-import PyPDF2
+import importlib
 import threading
-from app import *
 from agents import *
 from copy import copy
 from pathlib import Path
@@ -8,12 +7,38 @@ from datetime import date
 from common_imports import *
 from mlesolver import MLESolver
 import argparse, pickle, yaml
+from pypdf import PdfReader
 
 GLOBAL_AGENTRXIV = None
 DEFAULT_LLM_BACKBONE = "o3-mini"
 RESEARCH_DIR_PATH = "MATH_research_dir"
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+
+def load_agentrxiv_app():
+    optional_dependencies = {
+        "flask": "flask",
+        "flask_sqlalchemy": "flask-sqlalchemy",
+        "sentence_transformers": "sentence-transformers",
+    }
+    missing_packages = []
+    for module_name, package_name in optional_dependencies.items():
+        try:
+            importlib.import_module(module_name)
+        except ModuleNotFoundError:
+            missing_packages.append(package_name)
+
+    if missing_packages:
+        missing_list = ", ".join(sorted(missing_packages))
+        raise RuntimeError(
+            "AgentRxiv requires additional web dependencies that are not installed: "
+            f"{missing_list}. Install them with `pip install -r requirements.txt`."
+        )
+
+    from app import app, run_app, update_papers_from_uploads
+
+    return app, run_app, update_papers_from_uploads
 
 
 class LaboratoryWorkflow:
@@ -601,13 +626,15 @@ class AgentRxiv:
             return "Paper ID not found?"
 
     @staticmethod
-    def read_pdf_pypdf2(pdf_path):
+    def read_pdf_text(pdf_path):
         with open(pdf_path, 'rb') as pdf_file:
-            reader = PyPDF2.PdfReader(pdf_file)
+            reader = PdfReader(pdf_file)
             text = ''
             for page_num in range(len(reader.pages)):
                 page = reader.pages[page_num]
-                text += page.extract_text()
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text
         return text
 
     def search_agentrxiv(self, search_query, num_papers):
@@ -615,6 +642,7 @@ class AgentRxiv:
         url = f'http://127.0.0.1:{5000 + self.lab_index}/api/search?q={search_query}'
         return_str = str()
         try:
+            app, _, update_papers_from_uploads = load_agentrxiv_app()
             with app.app_context():
                 update_papers_from_uploads()
             response = requests.get(url)
@@ -628,7 +656,7 @@ class AgentRxiv:
                     filename = Path(f'_tmp_{self.lab_index}.pdf')
                     response = requests.get(result['pdf_url'])
                     filename.write_bytes(response.content)
-                    self.pdf_text[arxiv_id] = self.read_pdf_pypdf2(f'_tmp_{self.lab_index}.pdf')
+                    self.pdf_text[arxiv_id] = self.read_pdf_text(f'_tmp_{self.lab_index}.pdf')
                     self.summaries[arxiv_id] = query_model(
                         prompt=self.pdf_text[arxiv_id],
                         system_prompt="Please provide a 5 sentence summary of this paper.",
@@ -647,6 +675,7 @@ class AgentRxiv:
         return return_str
 
     def run_server(self, port):
+        _, run_app, _ = load_agentrxiv_app()
         run_app(port=port)
 
 
@@ -882,9 +911,6 @@ Advancements:
 - Run agent labs in parallel (asynch) 
 
 """
-
-
-
 
 
 

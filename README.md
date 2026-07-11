@@ -71,6 +71,8 @@ source venv_agent_lab/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
+- This install includes the dependencies used by the optional AgentRxiv web workflow.
+- TensorFlow is not required for the core Agent Laboratory workflows and is not installed by default.
 
 4. **Install pdflatex [OPTIONAL]**
 ```bash

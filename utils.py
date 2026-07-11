@@ -1,11 +1,17 @@
 import os, re
 import shutil
 import time
-import tiktoken, openai
+import openai
 import subprocess, string
 from openai import OpenAI
-import google.generativeai as genai
 from huggingface_hub import InferenceClient
+from tokenization import count_message_tokens, get_encoding
+
+
+def load_genai():
+    import google.generativeai as genai
+
+    return genai
 
 
 def query_deepseekv3(prompt, system, api_key, attempt=0, temperature=0.0):
@@ -23,7 +29,7 @@ def query_deepseekv3(prompt, system, api_key, attempt=0, temperature=0.0):
     except Exception as e:
         print(f"Query qwen error: {e}")
         if attempt >= 10: return f"Your attempt to query deepseekv3 failed: {e}"
-        return query_deepseekv3(prompt, system, attempt+1)
+        return query_deepseekv3(prompt, system, api_key, attempt=attempt+1, temperature=temperature)
 
 
 def query_qwen(prompt, system, api_key, attempt=0, temperature=0.0):
@@ -47,7 +53,7 @@ def query_qwen(prompt, system, api_key, attempt=0, temperature=0.0):
     except Exception as e:
         print(f"Query qwen error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
-        return query_qwen(prompt, system, attempt+1)
+        return query_qwen(prompt, system, api_key, attempt=attempt+1, temperature=temperature)
 
 
 def query_gpt4omini(prompt, system, api_key, attempt=0, temperature=0.0):
@@ -69,7 +75,7 @@ def query_gpt4omini(prompt, system, api_key, attempt=0, temperature=0.0):
     except Exception as e:
         print(f"Query 4o-mini error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
-        return query_gpt4omini(prompt, system, attempt+1)
+        return query_gpt4omini(prompt, system, api_key, attempt=attempt+1, temperature=temperature)
 
 
 
@@ -91,12 +97,13 @@ def query_gpt4o(prompt, system, api_key, attempt=0, temperature=0.0):
     except Exception as e:
         print(f"Query gpr-4o error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
-        return query_gpt4o(prompt, system, attempt+1)
+        return query_gpt4o(prompt, system, api_key, attempt=attempt+1, temperature=temperature)
 
 
 
 def query_gemini(prompt, system, api_key, attempt=0, temperature=0.0):
     try:
+        genai = load_genai()
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name="gemini-1.5-pro", system_instruction=system)
         response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=temperature)).text.strip()
@@ -106,12 +113,13 @@ def query_gemini(prompt, system, api_key, attempt=0, temperature=0.0):
         print(f"Gemini error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
         time.sleep(1)
-        return query_gemini(prompt, system, attempt+1)
+        return query_gemini(prompt, system, api_key, attempt=attempt+1, temperature=temperature)
 
 
 
 def query_gemini2p0(prompt, system, api_key, attempt=0, temperature=0.0,):
     try:
+        genai = load_genai()
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(model_name="gemini-2.0-flash", system_instruction=system)
         response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(temperature=temperature)).text.strip()
@@ -121,7 +129,7 @@ def query_gemini2p0(prompt, system, api_key, attempt=0, temperature=0.0,):
         print(f"Gemini error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
         time.sleep(1)
-        return query_gemini2p0(prompt, system, attempt+1)
+        return query_gemini2p0(prompt, system, api_key, attempt=attempt+1, temperature=temperature)
 
 
 def compile_latex(latex_code, output_path, compile=True, timeout=30):
@@ -161,9 +169,7 @@ def compile_latex(latex_code, output_path, compile=True, timeout=30):
 
 
 def count_tokens(messages, model="gpt-4"):
-    enc = tiktoken.encoding_for_model(model)
-    num_tokens = sum([len(enc.encode(message["content"])) for message in messages])
-    return num_tokens
+    return count_message_tokens(messages, model)
 
 def remove_figures():
     """Remove a directory if it exists."""
@@ -195,8 +201,8 @@ def save_to_file(location, filename, data):
 
 
 def clip_tokens(messages, model="gpt-4", max_tokens=100000):
-    enc = tiktoken.encoding_for_model(model)
-    total_tokens = sum([len(enc.encode(message["content"])) for message in messages])
+    enc = get_encoding(model)
+    total_tokens = count_message_tokens(messages, model)
 
     if total_tokens <= max_tokens:
         return messages  # No need to clip if under the limit
@@ -441,7 +447,7 @@ def strip_string(string):
 
     # remove percentage
     string = string.replace("\\%", "")
-    string = string.replace("\%", "")  # noqa: W605
+    string = string.replace("%", "")
 
     # " 0." equivalent to " ." and "{0." equivalent to "{." Alternatively, add "0" if "." is the start of the string
     string = string.replace(" .", " 0.")

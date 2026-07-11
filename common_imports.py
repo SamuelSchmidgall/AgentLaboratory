@@ -34,13 +34,31 @@ import plotly.graph_objects as go
 # Hugging Face & Transformers
 import transformers
 
+
+class MissingOptionalDependency:
+    def __init__(self, package_name, feature_description):
+        self.package_name = package_name
+        self.feature_description = feature_description
+
+    def __bool__(self):
+        return False
+
+    def __getattr__(self, name):
+        raise ImportError(
+            f"Optional dependency '{self.package_name}' is required for {self.feature_description}. "
+            f"Install it separately before using '{name}'."
+        )
+
 # Deep learning frameworks
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset, random_split
-import tensorflow as tf
+try:
+    import tensorflow as tf
+except ImportError:
+    tf = MissingOptionalDependency("tensorflow", "TensorFlow-backed experiments")
 #import keras
 
 # NLP Libraries

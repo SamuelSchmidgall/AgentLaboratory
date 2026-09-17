@@ -91,7 +91,7 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_ap
                 else:
                     client = OpenAI()
                     completion = client.chat.completions.create(
-                        model="o3-mini-2025-01-31", messages=messages)
+                        model="gpt-5.6-sol", messages=messages)
                 answer = completion.choices[0].message.content
 
             elif model_str == "claude-3.5-sonnet":
@@ -166,12 +166,12 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_ap
                     {"role": "user", "content": system_prompt + prompt}]
                 if version == "0.28":
                     completion = openai.ChatCompletion.create(
-                        model="o1-2024-12-17",  # engine = "deployment_name".
+                        model="gpt-5.6-sol",  # engine = "deployment_name".
                         messages=messages)
                 else:
                     client = OpenAI()
                     completion = client.chat.completions.create(
-                        model="o1-2024-12-17", messages=messages)
+                        model="gpt-5.6-sol", messages=messages)
                 answer = completion.choices[0].message.content
             elif model_str == "o1-preview":
                 model_str = "o1-preview"

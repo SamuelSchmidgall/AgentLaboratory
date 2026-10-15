@@ -3,11 +3,8 @@ from utils import *
 import os
 import time
 import arxiv
-import io, sys
-import traceback
 import matplotlib
 import numpy as np
-import multiprocessing
 from pypdf import PdfReader
 from datasets import load_dataset
 from psutil._common import bytes2human
@@ -15,6 +12,7 @@ from datasets import load_dataset_builder
 from semanticscholar import SemanticScholar
 from sklearn.metrics.pairwise import linear_kernel
 from sklearn.feature_extraction.text import TfidfVectorizer
+from code_executor import execute_python_code
 
 
 
@@ -289,20 +287,6 @@ class ArxivSearch:
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-def worker_run_code(code_str, output_queue):
-    output_capture = io.StringIO()
-    sys.stdout = output_capture
-    try:
-        # Create a globals dictionary with __name__ set to "__main__"
-        globals_dict = {"__name__": "__main__"}
-        exec(code_str, globals_dict)
-    except Exception as e:
-        output_capture.write(f"[CODE EXECUTION ERROR]: {str(e)}\n")
-        traceback.print_exc(file=output_capture)
-    finally:
-        sys.stdout = sys.__stdout__
-    output_queue.put(output_capture.getvalue())
-
 def execute_code(code_str, timeout=600, MAX_LEN=1000):
     #code_str = code_str.replace("\\n", "\n")
     code_str = "from utils import *\n" + code_str
@@ -310,16 +294,4 @@ def execute_code(code_str, timeout=600, MAX_LEN=1000):
         return "[CODE EXECUTION ERROR] pubmed Download took way too long. Program terminated"
     if "exit(" in code_str:
         return "[CODE EXECUTION ERROR] The exit() command is not allowed you must remove this."
-    output_queue = multiprocessing.Queue()
-    proc = multiprocessing.Process(target=worker_run_code, args=(code_str, output_queue))
-    proc.start()
-    proc.join(timeout)
-    if proc.is_alive():
-        proc.terminate()  # Forcefully kill the process
-        proc.join()
-        return (f"[CODE EXECUTION ERROR]: Code execution exceeded the timeout limit of {timeout} seconds. "
-                "You must reduce the time complexity of your code.")
-    else:
-        if not output_queue.empty(): output = output_queue.get()
-        else: output = ""
-        return output
+    return execute_python_code(code_str, timeout=timeout)

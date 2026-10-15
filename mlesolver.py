@@ -7,6 +7,7 @@ from abc import abstractmethod
 
 from tools import *
 from inference import *
+from reward_score import request_reward_score
 from pathlib import Path
 
 
@@ -139,15 +140,14 @@ class Edit(Command):
 
 
 def get_score(outlined_plan, code, code_return, REWARD_MODEL_LLM, attempts=3, openai_api_key=None):
-    e = str()
-    for _attempt in range(attempts):
-        try:
-            # todo: have a reward function here
-            sys = (
-                f"You are a professor agent who is serving as an expert reward model that can read a research plan, research code, and code output and are able to determine how well a model followed the plan, built the code, and got the proper output scored from 0 to 1 as a float.\n\n"
-                f"You must structure your score exactly in the following way: ```SCORE\n<score here>\n``` where SCORE is just the word score, <score here> is a floating point number between 0 and 1 representing how well the model followed the plan, built the code, and got the proper output."
-            )
-            scoring = query_model(
+    # todo: have a reward function here
+    sys = (
+        f"You are a professor agent who is serving as an expert reward model that can read a research plan, research code, and code output and are able to determine how well a model followed the plan, built the code, and got the proper output scored from 0 to 1 as a float.\n\n"
+        f"You must structure your score exactly in the following way: ```SCORE\n<score here>\n``` where SCORE is just the word score, <score here> is a floating point number between 0 and 1 representing how well the model followed the plan, built the code, and got the proper output."
+    )
+
+    def request_score():
+        return query_model(
                 model_str=f"{REWARD_MODEL_LLM}",
                 system_prompt=sys,
                 openai_api_key=openai_api_key,
@@ -155,12 +155,9 @@ def get_score(outlined_plan, code, code_return, REWARD_MODEL_LLM, attempts=3, op
                     f"Outlined in the following text is the research plan that the machine learning engineer was tasked with building: {outlined_plan}\n\n"
                     f"The following text is the research code that the model produced: \n{code}\n\n"
                     f"The following is the output from the model: {code_return}\n\n"), temp=0.6)
-            performance = extract_prompt(text=scoring, word="SCORE")
-            performance = float(performance)
-            return performance, f"The performance of your submission is: {performance}", True
-        except Exception as e:
-            return None, str(e), False
-    return 0, e
+
+    performance = request_reward_score(request_score, attempts=attempts)
+    return performance, f"The performance of your submission is: {performance}", True
 
 
 def code_repair(code, error, ctype, REPAIR_LLM, openai_api_key=None):

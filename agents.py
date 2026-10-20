@@ -262,8 +262,11 @@ class BaseAgent:
         model_resp = self.clean_text(model_resp)
         self.prev_comm = model_resp
         steps_exp = None
-        if feedback is not None and "```EXPIRATION" in feedback:
-            steps_exp = int(feedback.split("\n")[0].replace("```EXPIRATION ", ""))
+        # Only a leading numeric wrapper is a history control marker. Source
+        # material (including fetched web pages) may quote EXPIRATION examples.
+        expiration = re.match(r"\A```EXPIRATION ([0-9]+)\n", feedback or "")
+        if expiration is not None:
+            steps_exp = int(expiration.group(1))
             feedback = extract_prompt(feedback, "EXPIRATION")
         self.history.append((steps_exp, f"Step #{step}, Phase: {phase}, Feedback: {feedback}, Your response: {model_resp}"))
         # remove histories that have expiration dates

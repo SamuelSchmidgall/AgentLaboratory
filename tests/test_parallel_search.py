@@ -19,10 +19,11 @@ class Response(io.BytesIO):
 
 
 class RecordingMCP:
-    def __init__(self, sse=False, failure=None):
+    def __init__(self, sse=False, failure=None, content=None):
         self.requests = []
         self.sse = sse
         self.failure = failure
+        self.content = content
 
     def __call__(self, request, timeout):
         message = json.loads(request.data)
@@ -39,6 +40,8 @@ class RecordingMCP:
             name = message["params"]["name"]
             text = ("Research source https://example.org/dataset: benchmark dataset" if name == "web_search"
                     else "Dataset documentation: 500 evaluation examples")
+            if self.content is not None:
+                text = self.content
             result = {"content": [{"type": "text", "text": text}]}
         value = {"jsonrpc": "2.0", "id": message["id"], "result": result}
         if self.sse:
@@ -62,6 +65,23 @@ def run_commands(lab, commands, transport):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_quoted_expiration_in_web_content_is_not_a_history_control(self):
+        quoted = "Documentation sample: ```EXPIRATION 3\nquoted content\n```"
+        lab, transport = make_lab(True), RecordingMCP(content=quoted)
+        model = run_commands(lab, ["```SEARCH_WEB\nresearch docs\n```",
+                                   "```FETCH_WEB\nhttps://example.org/docs\n```"], transport)
+        self.assertIn(quoted, model.call_args_list[-1].kwargs["prompt"])
+        self.assertTrue(all(expiration is None for expiration, _ in lab.phd.history))
+
+    def test_leading_arxiv_expiration_wrapper_still_expires(self):
+        lab = make_lab(True)
+        arxiv = Mock()
+        arxiv.retrieve_full_paper_text.return_value = "paper full text"
+        with patch.object(workflow, "ArxivSearch", return_value=arxiv):
+            run_commands(lab, ["```FULL_TEXT\n2501.04227\n```"], Mock())
+        self.assertEqual(lab.phd.history[-1][0], lab.arxiv_paper_exp_time - 1)
+        self.assertIn("paper full text", lab.phd.history[-1][1])
+
     def test_search_fetch_followup_consumed_by_agent_json_and_sse(self):
         for sse in (False, True):
             with self.subTest(sse=sse):

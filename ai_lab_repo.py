@@ -8,6 +8,8 @@ from datetime import date
 from common_imports import *
 from mlesolver import MLESolver
 import argparse, pickle, yaml
+from uuid import uuid4
+from parallel_search import ParallelSearch, ParallelSearchError
 
 GLOBAL_AGENTRXIV = None
 DEFAULT_LLM_BACKBONE = "o3-mini"
@@ -17,7 +19,7 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
 class LaboratoryWorkflow:
-    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5, paper_index=0, except_if_fail=False, parallelized=False, lab_dir=None, lab_index=0, agentRxiv=False, agentrxiv_papers=5):
+    def __init__(self, research_topic, openai_api_key, max_steps=100, num_papers_lit_review=5, agent_model_backbone=f"{DEFAULT_LLM_BACKBONE}", notes=list(), human_in_loop_flag=None, compile_pdf=True, mlesolver_max_steps=3, papersolver_max_steps=5, paper_index=0, except_if_fail=False, parallelized=False, lab_dir=None, lab_index=0, agentRxiv=False, agentrxiv_papers=5, parallel_web_search=False):
         """
         Initialize laboratory workflow
         @param research_topic: (str) description of research idea to explore
@@ -26,6 +28,13 @@ class LaboratoryWorkflow:
         @param agent_model_backbone: (str or dict) model backbone to use for agents
         @param notes: (list) notes for agent to follow during tasks
         """
+        if type(parallel_web_search) is not bool:
+            raise ValueError("parallel-web-search must be a YAML boolean (true or false)")
+        self.parallel_web_search = parallel_web_search
+        # One identity per research run, retained by save_state and across phases.
+        # A new LaboratoryWorkflow (including each parallel lab) gets a new ID.
+        self.web_search_session_id = str(uuid4())
+        self.web_search_client = ParallelSearch() if parallel_web_search else None
         self.agentRxiv = agentRxiv
         self.max_prev_papers = 10
         self.parallelized = parallelized
@@ -93,6 +102,7 @@ class LaboratoryWorkflow:
         self.verbose = True
         self.reviewers = ReviewersAgent(model=self.model_backbone, notes=self.notes, openai_api_key=self.openai_api_key)
         self.phd = PhDStudentAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
+        self.phd.web_search_enabled = parallel_web_search
         self.postdoc = PostdocAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
         self.professor = ProfessorAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
         self.ml_engineer = MLEngineerAgent(model=self.model_backbone, notes=self.notes, max_steps=self.max_steps, openai_api_key=self.openai_api_key)
@@ -476,8 +486,23 @@ class LaboratoryWorkflow:
         for _i in range(max_tries):
             print(f"@@ Lab #{self.lab_index} Paper #{self.paper_index} @@")
             feedback = str()
+            # Keep permission checks at dispatch as well as in the model prompt.
+            # Older pickled workflows have no flag and remain disabled.
+            if "```SEARCH_WEB" in resp or "```FETCH_WEB" in resp:
+                if not getattr(self, "parallel_web_search", False):
+                    feedback = "Web search is disabled. Use SUMMARY or FULL_TEXT for arXiv papers."
+                else:
+                    command = "SEARCH_WEB" if "```SEARCH_WEB" in resp else "FETCH_WEB"
+                    query = extract_prompt(resp, command).strip()
+                    try:
+                        if command == "SEARCH_WEB":
+                            feedback = self.web_search_client.search(query, self.web_search_session_id)
+                        else:
+                            feedback = self.web_search_client.fetch(query, self.web_search_session_id)
+                    except ParallelSearchError as exc:
+                        feedback = f"Web command failed: {exc}"
             # grab summary of papers from arxiv
-            if "```SUMMARY" in resp:
+            elif "```SUMMARY" in resp:
                 query = extract_prompt(resp, "SUMMARY")
                 papers = arx_eng.find_papers_by_str(query, N=self.arxiv_num_summaries)
                 if self.agentRxiv:
@@ -668,6 +693,9 @@ def parse_yaml(yaml_file_loc):
     class YamlDataHolder:
         def __init__(self): pass
     parser = YamlDataHolder()
+    parser.parallel_web_search = agentlab_data.get('parallel-web-search', False)
+    if type(parser.parallel_web_search) is not bool:
+        raise ValueError("parallel-web-search must be a YAML boolean (true or false)")
     if "copilot_mode" in agentlab_data: parser.copilot_mode = agentlab_data["copilot_mode"]
     else: parser.copilot_mode = False
     if 'load-previous' in agentlab_data: parser.load_previous = agentlab_data["load-previous"]
@@ -811,7 +839,8 @@ if __name__ == "__main__":
                     except_if_fail=except_if_fail,
                     lab_dir=lab_dir,
                     agentRxiv=True,
-                    agentrxiv_papers=args.agentrxiv_papers
+                    agentrxiv_papers=args.agentrxiv_papers,
+                    parallel_web_search=args.parallel_web_search
                 )
                 lab_instance.perform_research()
                 time_str += str(time.time() - time_now) + " | "
@@ -856,7 +885,8 @@ if __name__ == "__main__":
                 except_if_fail=except_if_fail,
                 agentRxiv=False,
                 lab_index=lab_index,
-                lab_dir=f"./{lab_direct}"
+                lab_dir=f"./{lab_direct}",
+                parallel_web_search=args.parallel_web_search
             )
             lab.perform_research()
             time_str += str(time.time() - time_now) + " | "

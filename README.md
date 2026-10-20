@@ -90,6 +90,32 @@ sudo apt install pdflatex
 
 To run Agent Laboratory in copilot mode, simply set the copilot-mode flag in your yaml config to `"true"`
 
+### Optional web research
+
+Add `parallel-web-search: true` (a YAML boolean) to your experiment configuration
+to give the literature-review agent web search and page fetching through
+[Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp).
+Search uses Fast mode and needs no account or API key. No additional Python
+dependencies are required. Run your configuration with the usual command:
+
+```bash
+python ai_lab_repo.py --yaml-location "experiment_configs/MATH_agentlab.yaml"
+```
+
+The agent can issue `SEARCH_WEB` with a short query and `FETCH_WEB` with one
+HTTP(S) URL to find project documentation, dataset pages and other context beyond
+arXiv. Results feed back into its literature-review conversation. Paper selection
+still uses arXiv's `SUMMARY`, `FULL_TEXT` and `ADD_PAPER` commands; web URLs are
+supporting context, not paper IDs.
+
+The option defaults to `false`; omit it or set `parallel-web-search: false` to
+disable these web commands. Existing configurations and saved workflows retain
+their arXiv behavior. Queries and fetched URLs are sent to Parallel only when
+enabled. Each research run keeps its own opaque session ID, including across
+saved state and follow-up calls. Responses are limited to 20,000 characters, and
+network operations have a 30-second socket timeout. Service errors and free-tier
+quotas return feedback to the agent without automatically switching providers.
+
 -----
 ## Tips for better research outcomes
 

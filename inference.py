@@ -94,7 +94,10 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_ap
                         model="o3-mini-2025-01-31", messages=messages)
                 answer = completion.choices[0].message.content
 
-            elif model_str == "claude-3.5-sonnet":
+            else:
+                raise ValueError(f"Unsupported model: {model_str}. Supported: gpt-4o-mini, gpt-4o, o3-mini, gemini-1.5-pro, gemini-2.0-pro, claude-3.5-sonnet, deepseek-chat")
+
+            if model_str == "claude-3.5-sonnet":
                 client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
                 message = client.messages.create(
                     model="claude-3-5-sonnet-latest",

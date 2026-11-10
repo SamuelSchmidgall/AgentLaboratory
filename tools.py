@@ -95,7 +95,7 @@ class HFDataSearch:
         :param dwn_w: Weight for downloads.
         :return: List of top N dataset items.
         """
-        if not self.ds or self.description_vectors is None:
+        if self.description_vectors is None or len(self.ds) == 0:
             print("No datasets available to search.")
             return []
 

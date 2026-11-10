@@ -218,6 +218,8 @@ def clip_tokens(messages, model="gpt-4", max_tokens=100000):
     current_idx = 0
     for message in tokenized_messages:
         message_token_count = len(message["content"])
+        if current_idx >= len(clipped_tokens):
+            break
         if current_idx + message_token_count > len(clipped_tokens):
             clipped_message_content = clipped_tokens[current_idx:]
             clipped_message = enc.decode(clipped_message_content)

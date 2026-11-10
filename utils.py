@@ -23,7 +23,7 @@ def query_deepseekv3(prompt, system, api_key, attempt=0, temperature=0.0):
     except Exception as e:
         print(f"Query qwen error: {e}")
         if attempt >= 10: return f"Your attempt to query deepseekv3 failed: {e}"
-        return query_deepseekv3(prompt, system, attempt+1)
+        return query_deepseekv3(prompt, system, api_key, attempt+1, temperature=temperature)
 
 
 def query_qwen(prompt, system, api_key, attempt=0, temperature=0.0):
@@ -47,7 +47,7 @@ def query_qwen(prompt, system, api_key, attempt=0, temperature=0.0):
     except Exception as e:
         print(f"Query qwen error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
-        return query_qwen(prompt, system, attempt+1)
+        return query_qwen(prompt, system, api_key, attempt+1, temperature=temperature)
 
 
 def query_gpt4omini(prompt, system, api_key, attempt=0, temperature=0.0):
@@ -69,7 +69,7 @@ def query_gpt4omini(prompt, system, api_key, attempt=0, temperature=0.0):
     except Exception as e:
         print(f"Query 4o-mini error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
-        return query_gpt4omini(prompt, system, attempt+1)
+        return query_gpt4omini(prompt, system, api_key, attempt+1, temperature=temperature)
 
 
 
@@ -91,7 +91,7 @@ def query_gpt4o(prompt, system, api_key, attempt=0, temperature=0.0):
     except Exception as e:
         print(f"Query gpr-4o error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
-        return query_gpt4o(prompt, system, attempt+1)
+        return query_gpt4o(prompt, system, api_key, attempt+1, temperature=temperature)
 
 
 
@@ -106,7 +106,7 @@ def query_gemini(prompt, system, api_key, attempt=0, temperature=0.0):
         print(f"Gemini error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
         time.sleep(1)
-        return query_gemini(prompt, system, attempt+1)
+        return query_gemini(prompt, system, api_key, attempt+1, temperature=temperature)
 
 
 
@@ -121,7 +121,7 @@ def query_gemini2p0(prompt, system, api_key, attempt=0, temperature=0.0,):
         print(f"Gemini error: {e}")
         if attempt >= 10: return f"Your attempt to inference gemini failed: {e}"
         time.sleep(1)
-        return query_gemini2p0(prompt, system, attempt+1)
+        return query_gemini2p0(prompt, system, api_key, attempt+1, temperature=temperature)
 
 
 def compile_latex(latex_code, output_path, compile=True, timeout=30):

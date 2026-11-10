@@ -30,7 +30,7 @@ def curr_cost_est():
         "o1": 60.00 / 1000000,
         "o3-mini": 4.40 / 1000000,
     }
-    return sum([costmap_in[_]*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out[_]*TOKENS_OUT[_] for _ in TOKENS_OUT])
+    return sum([costmap_in.get(_, 0)*TOKENS_IN[_] for _ in TOKENS_IN]) + sum([costmap_out.get(_, 0)*TOKENS_OUT[_] for _ in TOKENS_OUT])
 
 def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_api_key=None,  anthropic_api_key=None, tries=5, timeout=5.0, temp=None, print_cost=True, version="1.5"):
     preloaded_api = os.getenv('OPENAI_API_KEY')

@@ -80,7 +80,8 @@ def query_gpt4o(prompt, system, api_key, attempt=0, temperature=0.0):
         os.environ["OPENAI_API_KEY"] = openai_api_key
         if system is not None:
             messages = [
-                {"role": "user", "content":system + prompt}]
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt}]
         else:
             messages = [
                 {"role": "user", "content": prompt}]

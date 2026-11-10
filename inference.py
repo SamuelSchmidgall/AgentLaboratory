@@ -74,10 +74,14 @@ def query_model(model_str, prompt, system_prompt, openai_api_key=None, gemini_ap
                 answer = completion.choices[0].message.content
 
             elif model_str == "gemini-2.0-pro":
+                if gemini_api_key is None:
+                    raise ValueError("gemini_api_key is required for gemini models")
                 genai.configure(api_key=gemini_api_key)
                 model = genai.GenerativeModel(model_name="gemini-2.0-pro-exp-02-05", system_instruction=system_prompt)
                 answer = model.generate_content(prompt).text
             elif model_str == "gemini-1.5-pro":
+                if gemini_api_key is None:
+                    raise ValueError("gemini_api_key is required for gemini models")
                 genai.configure(api_key=gemini_api_key)
                 model = genai.GenerativeModel(model_name="gemini-1.5-pro", system_instruction=system_prompt)
                 answer = model.generate_content(prompt).text

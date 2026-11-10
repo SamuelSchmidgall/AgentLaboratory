@@ -108,12 +108,12 @@ def search():
     if query:
         papers = Paper.query.all()
         query_embedding = model.encode([query])
-        paper_texts = [paper.text for paper in papers if paper.text]
+        paper_texts = [paper.text for paper in papers if paper.text is not None and paper.text.strip()]
         if not paper_texts:
             return render_template('search.html', papers=[], query=query)
         paper_embeddings = model.encode(paper_texts)
         similarities = cosine_similarity(query_embedding, paper_embeddings)[0]
-        papers_with_scores = list(zip([p for p in papers if p.text], similarities))
+        papers_with_scores = list(zip([p for p in papers if p.text is not None and p.text.strip()], similarities))
         papers_sorted = sorted(papers_with_scores, key=lambda x: x[1], reverse=True)
         return render_template('search.html', papers=papers_sorted, query=query)
     return render_template('search.html', papers=[], query=query)
@@ -127,7 +127,7 @@ def api_search():
     if not papers:
         return jsonify({'query': query, 'results': []})
     query_embedding = model.encode([query])
-    paper_texts = [paper.text for paper in papers if paper.text]
+    paper_texts = [paper.text for paper in papers if paper.text is not None and paper.text.strip()]
     if not paper_texts:
         return jsonify({'query': query, 'results': []})
     paper_embeddings = model.encode(paper_texts)

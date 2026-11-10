@@ -162,7 +162,7 @@ def compile_latex(latex_code, output_path, compile=True, timeout=30):
 
 def count_tokens(messages, model="gpt-4"):
     enc = tiktoken.encoding_for_model(model)
-    num_tokens = sum([len(enc.encode(message["content"])) for message in messages])
+    num_tokens = sum([len(enc.encode(message.get("content") or "")) for message in messages])
     return num_tokens
 
 def remove_figures():
